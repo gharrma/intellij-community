@@ -84,8 +84,9 @@ public class OptimizeImportsProcessor extends AbstractLayoutCodeProcessor {
       return emptyTask();
     }
 
-    List<HintAction> hints = ApplicationManager.getApplication().isDispatchThread() ?
-                             Collections.emptyList() : ShowAutoImportPass.getImportHints(file);
+    List<HintAction> hints = !ApplicationManager.getApplication().isDispatchThread() &&
+                             ShowAutoImportPass.isAddUnambiguousImportsOnTheFlyEnabled(file)
+                             ? ShowAutoImportPass.getImportHints(file) : Collections.emptyList();
 
     return new FutureTask<>(() -> {
       ApplicationManager.getApplication().assertIsDispatchThread();
