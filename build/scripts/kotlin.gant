@@ -9,5 +9,15 @@ target("artifact": "Build Kotlin IDE Artifacts") {
   String home = new File(IdeaProjectLoader.guessHome(this)).absolutePath
   // Google: we do not have access to IJ Ultimate build scripts.
   // BuildUtils.addUltimateBuildScriptsToClassPath(home, ant)
-  new KotlinPluginBuilder(home, home, new IdeaCommunityProperties(home)).build()
+  new KotlinPluginBuilder(home, home, new KotlinIdeaProperties(home)).build()
+}
+
+// Google: exclude unnecessary plugins from the build, especially the Android plugin.
+class KotlinIdeaProperties extends IdeaCommunityProperties {
+  KotlinIdeaProperties(String home) {
+    super(home)
+    // We only care about building the Kotlin plugin, nothing else.
+    productLayout.bundledPluginModules = []
+    productLayout.allNonTrivialPlugins = [KotlinPluginBuilder.kotlinPlugin()]
+  }
 }
