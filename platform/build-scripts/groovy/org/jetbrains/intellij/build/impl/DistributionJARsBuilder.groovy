@@ -784,6 +784,9 @@ final class DistributionJARsBuilder {
    */
   @NotNull
   private static Predicate<PluginLayout> loadPluginAutoPublishList(@NotNull BuildContext buildContext) {
+    // Google: we don't want to auto-publish any plugins, and the file
+    // plugins-autoupload.txt exists in the IJ Ultimate repo only.
+    if (true) return { false } as Predicate<PluginLayout>
     //noinspection SpellCheckingInspection
     String productCode = buildContext.applicationInfo.productCode
     Collection<String> config = Files.lines(buildContext.paths.communityHomeDir.resolve("../build/plugins-autoupload.txt"))
