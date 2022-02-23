@@ -356,6 +356,12 @@ class KotlinPluginBuilder {
 
   def build() {
     BuildContext buildContext = BuildContext.createContext(communityHome, home, properties)
+
+    // Google: the module intellij.idea.community.build.tasks contains BuildHelper,
+    // which is needed by DistributionJARsBuilder during the build. So, we build it
+    // here. An alternative solution is to run the full 'build' ant target first.
+    BuildTasks.create(buildContext).compileModules(["intellij.idea.community.build.tasks"], [])
+
     BuildTasks.create(buildContext).buildNonBundledPlugins([MAIN_KOTLIN_PLUGIN_MODULE])
   }
 
