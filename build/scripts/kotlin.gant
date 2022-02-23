@@ -7,6 +7,7 @@ import org.jetbrains.jps.idea.IdeaProjectLoader
 
 target("artifact": "Build Kotlin IDE Artifacts") {
   String home = new File(IdeaProjectLoader.guessHome(this)).absolutePath
-  BuildUtils.addUltimateBuildScriptsToClassPath(home, ant)
+  // Google: we do not have access to IJ Ultimate build scripts.
+  // BuildUtils.addUltimateBuildScriptsToClassPath(home, ant)
   new KotlinPluginBuilder(home, home, new IdeaCommunityProperties(home)).build()
 }
