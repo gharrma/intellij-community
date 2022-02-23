@@ -326,6 +326,11 @@ final class KotlinPluginBuilder {
     BuildTasks.create(buildContext).compileModules(["intellij.idea.community.build.tasks"], [])
 
     BuildTasks.create(buildContext).buildNonBundledPlugins([MAIN_KOTLIN_PLUGIN_MODULE])
+
+    // Google: produce a zip of Kotlin plugin sources.
+    def sourcesZip = Path.of(buildContext.paths.artifacts, "kotlin-plugin-sources.zip")
+    def kotlinModules = kotlinPlugin().includedModuleNames
+    BuildTasks.create(buildContext).zipSourcesOfModules(kotlinModules, sourcesZip, /*libraries*/ true)
   }
 
   enum KotlinPluginKind {

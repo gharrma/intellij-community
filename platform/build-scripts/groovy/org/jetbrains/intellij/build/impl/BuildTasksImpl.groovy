@@ -101,8 +101,11 @@ final class BuildTasksImpl extends BuildTasks {
         List<String> debugMapping = new ArrayList<>()
         for (String moduleName in modules) {
           JpsModule module = buildContext.findRequiredModule(moduleName)
-          if (moduleName.startsWith("intellij.platform.") && buildContext.findModule("${moduleName}.impl") != null) {
+          // Google: we want sources for the libs of all modules specified, not just intellij.platform modules.
+          // To upstream this, create a new overload for 'zipSourcesOfModules' which accepts an explicit list of libraries.
+          if (true || moduleName.startsWith("intellij.platform.") && buildContext.findModule("${moduleName}.impl") != null) {
             Set<JpsLibrary> libraries = JpsJavaExtensionService.dependencies(module).productionOnly().compileOnly().recursivelyExportedOnly().libraries
+              .findAll { lib -> lib.name.startsWith("kotlinc.") } // Google: we only want kotlinc libs for now.
             includedLibraries.addAll(libraries)
             libraries.collect(debugMapping) {
               it.name + " for " + moduleName
