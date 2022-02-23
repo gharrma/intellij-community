@@ -1,0 +1,7 @@
+# In general this repo should only have a few diffs relative to the corresponding
+# "kt" branch in JetBrains/intellij-community. Small patches are allowed if they
+# are relatively safe and have already been submitted upstream. This OWNERS file
+# is here to enforce that policy.
+gharrma@google.com
+ralucas@google.com
+jvg@google.com
