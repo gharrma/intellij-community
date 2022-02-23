@@ -8,6 +8,15 @@ object KotlinPluginBuildTarget {
   @JvmStatic
   fun main(args: Array<String>) {
     val communityHome = IdeaProjectLoaderUtil.guessCommunityHome(javaClass).toString()
-    KotlinPluginBuilder(communityHome, communityHome, IdeaCommunityProperties(communityHome)).build()
+    KotlinPluginBuilder(communityHome, communityHome, KotlinIdeaProperties(communityHome)).build()
+  }
+}
+
+// Google: exclude unnecessary plugins from the build, especially the Android plugin.
+class KotlinIdeaProperties(home: String) : IdeaCommunityProperties(home) {
+  init {
+    // We only care about building the Kotlin plugin, nothing else.
+    productLayout.bundledPluginModules = emptyList()
+    productLayout.allNonTrivialPlugins = listOf(KotlinPluginBuilder.kotlinPlugin())
   }
 }
