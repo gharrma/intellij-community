@@ -57,7 +57,9 @@ class KotlinPluginBuilder {
     "kotlin.compiler-plugins.lombok.gradle",
     "kotlin.compiler-plugins.lombok.maven",
     "kotlin.compiler-plugins.scripting",
-    "kotlin.compiler-plugins.android-extensions-stubs",
+    // Google: this is a workaround for b/218317110 in which these Android stubs
+    // conflict with layoutlib.jar in dev builds.
+    // "kotlin.compiler-plugins.android-extensions-stubs",
     "kotlin.jvm-run-configurations",
     "kotlin.maven",
     "kotlin.gradle.gradle-tooling",
