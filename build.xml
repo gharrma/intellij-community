@@ -21,6 +21,8 @@
       <arg line="setupJdks setupKotlinCompiler"/>
     </exec>
     <propertyset id="intellij.build.properties">
+      <!-- Google: Allow passing the Kotlin plugin kind through Ant. -->
+      <propertyref name="kotlin.plugin.kind"/>
       <propertyref name="build.number"/>
       <propertyref name="compile.parallel"/>
       <propertyref name="compile.parallel.max.threads"/>
@@ -69,5 +71,10 @@
   <!-- Creates an updater-full.jar in ${intellij.build.output.root}/artifacts, it includes 'intellij.platform.updater' module with all its dependencies -->
   <target name="fullupdater" depends="init">
     <call_gant script="${project.home}/build/scripts/idea_community.gant" target="updater-full"/>
+  </target>
+
+  <!-- Google: allowing building the kotlin.gant target through Ant. -->
+  <target name="kotlin_plugin" depends="init">
+    <call_gant script="${project.home}/build/scripts/kotlin.gant" target="artifact"/>
   </target>
 </project>

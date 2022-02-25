@@ -57,7 +57,9 @@ class KotlinPluginBuilder {
     "kotlin.compiler-plugins.lombok.gradle",
     "kotlin.compiler-plugins.lombok.maven",
     "kotlin.compiler-plugins.scripting",
-    "kotlin.compiler-plugins.android-extensions-stubs",
+    // Google: this is a workaround for b/218317110 in which these Android stubs
+    // conflict with layoutlib.jar in dev builds.
+    // "kotlin.compiler-plugins.android-extensions-stubs",
     "kotlin.jvm-run-configurations",
     "kotlin.maven",
     "kotlin.gradle.gradle-tooling",
@@ -356,7 +358,18 @@ class KotlinPluginBuilder {
 
   def build() {
     BuildContext buildContext = BuildContext.createContext(communityHome, home, properties)
+
+    // Google: the module intellij.idea.community.build.tasks contains BuildHelper,
+    // which is needed by DistributionJARsBuilder during the build. So, we build it
+    // here. An alternative solution is to run the full 'build' ant target first.
+    BuildTasks.create(buildContext).compileModules(["intellij.idea.community.build.tasks"], [])
+
     BuildTasks.create(buildContext).buildNonBundledPlugins([MAIN_KOTLIN_PLUGIN_MODULE])
+
+    // Google: produce a zip of Kotlin plugin sources.
+    def sourcesZip = Path.of(buildContext.paths.artifacts, "kotlin-plugin-sources.zip")
+    def kotlinModules = kotlinPlugin().includedModuleNames
+    BuildTasks.create(buildContext).zipSourcesOfModules(kotlinModules, sourcesZip, /*libraries*/ true)
   }
 
   enum KotlinPluginKind {
