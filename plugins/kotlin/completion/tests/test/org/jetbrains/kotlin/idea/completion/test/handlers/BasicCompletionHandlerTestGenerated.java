@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.kotlin.idea.completion.test.handlers;
 
@@ -28,6 +28,16 @@ public class BasicCompletionHandlerTestGenerated extends AbstractBasicCompletion
         runTest("testData/handlers/basic/AddLabelToReturn.kt");
     }
 
+    @TestMetadata("AmbiguousSuperMethod.kt")
+    public void testAmbiguousSuperMethod() throws Exception {
+        runTest("testData/handlers/basic/AmbiguousSuperMethod.kt");
+    }
+
+    @TestMetadata("AmbiguousSuperMethodWithArgument.kt")
+    public void testAmbiguousSuperMethodWithArgument() throws Exception {
+        runTest("testData/handlers/basic/AmbiguousSuperMethodWithArgument.kt");
+    }
+
     @TestMetadata("ClassKeywordBeforeName.kt")
     public void testClassKeywordBeforeName() throws Exception {
         runTest("testData/handlers/basic/ClassKeywordBeforeName.kt");
@@ -41,6 +51,11 @@ public class BasicCompletionHandlerTestGenerated extends AbstractBasicCompletion
     @TestMetadata("ClassNameForMethodWithPackageConflict2.kt")
     public void testClassNameForMethodWithPackageConflict2() throws Exception {
         runTest("testData/handlers/basic/ClassNameForMethodWithPackageConflict2.kt");
+    }
+
+    @TestMetadata("ClassNameWithAliasConfict.kt")
+    public void testClassNameWithAliasConfict() throws Exception {
+        runTest("testData/handlers/basic/ClassNameWithAliasConfict.kt");
     }
 
     @TestMetadata("ClassNameWithPackageConflict.kt")
@@ -108,6 +123,31 @@ public class BasicCompletionHandlerTestGenerated extends AbstractBasicCompletion
         runTest("testData/handlers/basic/InterfaceNameBeforeRunBug.kt");
     }
 
+    @TestMetadata("JavaClassName.kt")
+    public void testJavaClassName() throws Exception {
+        runTest("testData/handlers/basic/JavaClassName.kt");
+    }
+
+    @TestMetadata("JavaClassNameWithAliasConfict.kt")
+    public void testJavaClassNameWithAliasConfict() throws Exception {
+        runTest("testData/handlers/basic/JavaClassNameWithAliasConfict.kt");
+    }
+
+    @TestMetadata("JavaClassNameWithConflict.kt")
+    public void testJavaClassNameWithConflict() throws Exception {
+        runTest("testData/handlers/basic/JavaClassNameWithConflict.kt");
+    }
+
+    @TestMetadata("JavaClassNameWithConflict2.kt")
+    public void testJavaClassNameWithConflict2() throws Exception {
+        runTest("testData/handlers/basic/JavaClassNameWithConflict2.kt");
+    }
+
+    @TestMetadata("JavaClassNameWithKotlinNestedClassConflict.kt")
+    public void testJavaClassNameWithKotlinNestedClassConflict() throws Exception {
+        runTest("testData/handlers/basic/JavaClassNameWithKotlinNestedClassConflict.kt");
+    }
+
     @TestMetadata("JavaSAM.kt")
     public void testJavaSAM() throws Exception {
         runTest("testData/handlers/basic/JavaSAM.kt");
@@ -151,6 +191,11 @@ public class BasicCompletionHandlerTestGenerated extends AbstractBasicCompletion
     @TestMetadata("LocalFunction.kt")
     public void testLocalFunction() throws Exception {
         runTest("testData/handlers/basic/LocalFunction.kt");
+    }
+
+    @TestMetadata("NestedClassNameWithFileLevelConflict.kt")
+    public void testNestedClassNameWithFileLevelConflict() throws Exception {
+        runTest("testData/handlers/basic/NestedClassNameWithFileLevelConflict.kt");
     }
 
     @TestMetadata("NestedTypeArg.kt")
@@ -223,6 +268,11 @@ public class BasicCompletionHandlerTestGenerated extends AbstractBasicCompletion
         runTest("testData/handlers/basic/SuperMethod2.kt");
     }
 
+    @TestMetadata("SuperMethodWithDifferentParameterNames.kt")
+    public void testSuperMethodWithDifferentParameterNames() throws Exception {
+        runTest("testData/handlers/basic/SuperMethodWithDifferentParameterNames.kt");
+    }
+
     @TestMetadata("SuperTypeArg.kt")
     public void testSuperTypeArg() throws Exception {
         runTest("testData/handlers/basic/SuperTypeArg.kt");
@@ -233,6 +283,26 @@ public class BasicCompletionHandlerTestGenerated extends AbstractBasicCompletion
         runTest("testData/handlers/basic/SyntheticExtension.kt");
     }
 
+    @TestMetadata("TypeAliasConfict.kt")
+    public void testTypeAliasConfict() throws Exception {
+        runTest("testData/handlers/basic/TypeAliasConfict.kt");
+    }
+
+    @TestMetadata("TypeAliasConfict1.kt")
+    public void testTypeAliasConfict1() throws Exception {
+        runTest("testData/handlers/basic/TypeAliasConfict1.kt");
+    }
+
+    @TestMetadata("TypeAliasConfict2.kt")
+    public void testTypeAliasConfict2() throws Exception {
+        runTest("testData/handlers/basic/TypeAliasConfict2.kt");
+    }
+
+    @TestMetadata("TypeAliasConfict3.kt")
+    public void testTypeAliasConfict3() throws Exception {
+        runTest("testData/handlers/basic/TypeAliasConfict3.kt");
+    }
+
     @TestMetadata("TypeInferedFromWrapperType.kt")
     public void testTypeInferedFromWrapperType() throws Exception {
         runTest("testData/handlers/basic/TypeInferedFromWrapperType.kt");
@@ -241,6 +311,26 @@ public class BasicCompletionHandlerTestGenerated extends AbstractBasicCompletion
     @TestMetadata("TypeParameter.kt")
     public void testTypeParameter() throws Exception {
         runTest("testData/handlers/basic/TypeParameter.kt");
+    }
+
+    @TestMetadata("UnstableSmartCast.kt")
+    public void testUnstableSmartCast() throws Exception {
+        runTest("testData/handlers/basic/UnstableSmartCast.kt");
+    }
+
+    @TestMetadata("UnstableSmartCast_notDenotable.kt")
+    public void testUnstableSmartCast_notDenotable() throws Exception {
+        runTest("testData/handlers/basic/UnstableSmartCast_notDenotable.kt");
+    }
+
+    @TestMetadata("UnstableSmartCast_typeAlias.kt")
+    public void testUnstableSmartCast_typeAlias() throws Exception {
+        runTest("testData/handlers/basic/UnstableSmartCast_typeAlias.kt");
+    }
+
+    @TestMetadata("UnstableSmartCast_typeParams.kt")
+    public void testUnstableSmartCast_typeParams() throws Exception {
+        runTest("testData/handlers/basic/UnstableSmartCast_typeParams.kt");
     }
 
     @RunWith(JUnit3RunnerWithInners.class)

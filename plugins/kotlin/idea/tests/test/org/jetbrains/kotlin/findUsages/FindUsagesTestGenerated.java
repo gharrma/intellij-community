@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.kotlin.findUsages;
 
@@ -31,6 +31,11 @@ public abstract class FindUsagesTestGenerated extends AbstractFindUsagesTest {
             @TestMetadata("inContainingClass.0.kt")
             public void testInContainingClass() throws Exception {
                 runTest("testData/findUsages/kotlin/companionObject/inContainingClass.0.kt");
+            }
+
+            @TestMetadata("inContainingClassNoErrors.0.kt")
+            public void testInContainingClassNoErrors() throws Exception {
+                runTest("testData/findUsages/kotlin/companionObject/inContainingClassNoErrors.0.kt");
             }
 
             @TestMetadata("javaUsage.0.kt")

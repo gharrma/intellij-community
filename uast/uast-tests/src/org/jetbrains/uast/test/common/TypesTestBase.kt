@@ -15,8 +15,6 @@
  */
 package org.jetbrains.uast.test.common
 
-import com.intellij.lang.jvm.annotation.JvmAnnotationConstantValue
-import com.intellij.lang.jvm.annotation.JvmAnnotationEnumFieldValue
 import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UFile
@@ -58,21 +56,7 @@ interface TypesTestBase {
       builder.append(initialLine)
       if (node is UExpression) {
         val value = node.getExpressionType()
-        value?.let { psiType ->
-          builder.append(" : ")
-          psiType.annotations.takeIf { it.isNotEmpty() }?.joinTo(builder, ", ", "{", "}") { annotation ->
-            "@${annotation.qualifiedName}(${
-              annotation.attributes.joinToString { attr ->
-                attr.attributeName + " = " + when (val v = attr.attributeValue) {
-                  is JvmAnnotationConstantValue -> v.constantValue
-                  is JvmAnnotationEnumFieldValue -> v.fieldName
-                  else -> v
-                }
-              }
-            })"
-          }
-          builder.append(psiType)
-        }
+        value?.let { builder.append(" : ").append(it) }
       }
       builder.appendln()
       level++

@@ -22,9 +22,9 @@ import org.jetbrains.kotlin.platform.js.JsPlatforms
 import org.jetbrains.kotlin.platform.js.isJs
 import org.jetbrains.kotlin.platform.jvm.JvmPlatforms
 import org.jetbrains.kotlin.platform.jvm.isJvm
-import org.jetbrains.kotlin.test.utils.IgnoreTests
-import org.jetbrains.kotlin.test.InTextDirectivesUtils
+import org.jetbrains.kotlin.idea.test.InTextDirectivesUtils
 import org.jetbrains.kotlin.utils.addToStdlib.safeAs
+import org.jetbrains.kotlin.test.utils.IgnoreTests
 import org.junit.Assert
 
 /**
@@ -65,6 +65,8 @@ object ExpectedCompletionUtils {
             }
         }
 
+        operator fun get(key: String): String? = map[key]
+
         fun matches(expectedProposal: CompletionProposal, ignoreProperties: Collection<String>): Boolean {
             return expectedProposal.map.entries.none { expected ->
                 val actualValues = when (expected.key) {
@@ -78,8 +80,6 @@ object ExpectedCompletionUtils {
                 expected.value !in actualValues
             }
         }
-
-        operator fun get(key: String): String? = map[key]
 
         override fun toString(): String {
             val jsonObject = JsonObject()

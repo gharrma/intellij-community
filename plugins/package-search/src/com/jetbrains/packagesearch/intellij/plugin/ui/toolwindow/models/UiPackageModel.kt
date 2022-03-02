@@ -70,7 +70,7 @@ internal fun PackageModel.Installed.toUiPackageModel(
         selectedVersion = latestInstalledVersion,
         selectedScope = declaredScopes.firstOrNull() ?: defaultScope,
         mixedBuildSystemTargets = targetModules.isMixedBuildSystems,
-        packageOperations = project.lifecycleScope.computeActionsFor(this, targetModules, knownRepositoriesInTargetModules, onlyStable),
+        packageOperations = project.lifecycleScope.computeActionsAsync(project, this, targetModules, knownRepositoriesInTargetModules, onlyStable),
         sortedVersions = sortedVersions
     )
 }
@@ -99,6 +99,7 @@ internal fun PackageModel.SearchResult.toUiPackageModel(
     knownRepositoriesInTargetModules: KnownRepositories.InTargetModules,
     onlyStable: Boolean
 ) = toUiPackageModel(
+    project = project,
     declaredScopes = targetModules.declaredScopes(project),
     defaultScope = targetModules.defaultScope(project),
     mixedBuildSystems = targetModules.isMixedBuildSystems,
@@ -110,6 +111,7 @@ internal fun PackageModel.SearchResult.toUiPackageModel(
 )
 
 internal fun PackageModel.SearchResult.toUiPackageModel(
+    project: Project,
     declaredScopes: List<PackageScope>,
     defaultScope: PackageScope,
     mixedBuildSystems: Boolean,
@@ -120,22 +122,25 @@ internal fun PackageModel.SearchResult.toUiPackageModel(
     coroutineScope: CoroutineScope
 ): UiPackageModel.SearchResult {
     val sortedVersions = getAvailableVersions(onlyStable).sortedDescending()
+    val selectedVersion = searchResultUiState?.selectedVersion ?: sortedVersions.first()
+    val selectedScope = searchResultUiState?.selectedScope ?: defaultScope
     return UiPackageModel.SearchResult(
         packageModel = this,
         declaredScopes = declaredScopes,
         userDefinedScopes = emptyList(),
         defaultVersion = sortedVersions.first(),
         defaultScope = defaultScope,
-        selectedVersion = searchResultUiState?.selectedVersion ?: NormalizedPackageVersion.Missing,
-        selectedScope = searchResultUiState?.selectedScope ?: defaultScope,
+        selectedVersion = selectedVersion,
+        selectedScope = selectedScope,
         mixedBuildSystemTargets = mixedBuildSystems,
-        packageOperations = coroutineScope.computeActionsFor(
+        packageOperations = coroutineScope.computeActionsAsync(
+            project = project,
             packageModel = this,
             targetModules = targetModules,
             knownRepositoriesInTargetModules = knownRepositoriesInTargetModules,
             onlyStable = onlyStable,
-            selectedScope = searchResultUiState?.selectedScope ?: defaultScope,
-            selectedVersion = searchResultUiState?.selectedVersion ?: NormalizedPackageVersion.Missing
+            selectedScope = selectedScope,
+            selectedVersion = selectedVersion
         ),
         sortedVersions = sortedVersions
     )

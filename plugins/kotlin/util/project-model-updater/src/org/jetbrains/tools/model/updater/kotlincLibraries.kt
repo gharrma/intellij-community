@@ -11,7 +11,10 @@ fun generateKotlincLibraries(kotlincArtifactsMode: KotlincArtifactsMode, version
         kotlincForIdeWithStandardNaming("kotlinc.high-level-api-fir-tests", version),
         kotlincForIdeWithStandardNaming("kotlinc.high-level-api-fir", version),
         kotlincForIdeWithStandardNaming("kotlinc.high-level-api", version),
+        kotlincForIdeWithStandardNaming("kotlinc.high-level-api-impl-base", version),
+        kotlincForIdeWithStandardNaming("kotlinc.high-level-api-impl-base-tests", version),
         kotlincForIdeWithStandardNaming("kotlinc.analysis-api-providers", version),
+        kotlincForIdeWithStandardNaming("kotlinc.analysis-project-structure", version),
         kotlincForIdeWithStandardNaming("kotlinc.symbol-light-classes", version),
         kotlincForIdeWithStandardNaming("kotlinc.incremental-compilation-impl-tests", version),
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-build-common-tests", version),
@@ -19,6 +22,10 @@ fun generateKotlincLibraries(kotlincArtifactsMode: KotlincArtifactsMode, version
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-testdata", version, includeSources = false),
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-tests", version),
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler", version),
+        kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-common", version),
+        kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-fe10", version),
+        kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-fir", version),
+        kotlincForIdeWithStandardNaming("kotlinc.kotlin-compiler-ir", version),
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-dist", version),
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-gradle-statistics", version),
         kotlincForIdeWithStandardNaming("kotlinc.kotlin-stdlib-minimal-for-test", version),
@@ -33,7 +40,7 @@ fun generateKotlincLibraries(kotlincArtifactsMode: KotlincArtifactsMode, version
         singleJarMvnLib("kotlinc.kotlin-scripting-compiler-impl", "$ktGroup:kotlin-scripting-compiler-impl:$version", transitive = false),
         singleJarMvnLib("kotlinc.kotlin-scripting-compiler", "$ktGroup:kotlin-scripting-compiler:$version", transitive = false),
         singleJarMvnLib("kotlinc.kotlin-scripting-jvm", "$ktGroup:kotlin-scripting-jvm:$version", transitive = false),
-        singleJarMvnLib("kotlin-reflect", "$ktGroup:kotlin-reflect:$version", excludes = listOf(MavenId(ktGroup, "kotlin-stdlib"))),
+        singleJarMvnLib("kotlinc.kotlin-reflect", "$ktGroup:kotlin-reflect:$version", excludes = listOf(MavenId(ktGroup, "kotlin-stdlib"))),
         singleJarMvnLib("kotlin-script-runtime", "$ktGroup:kotlin-script-runtime:$version"),
         run {
             val mavenIds = listOf(
@@ -43,7 +50,7 @@ fun generateKotlincLibraries(kotlincArtifactsMode: KotlincArtifactsMode, version
                 MavenId.fromCoordinates("$ktGroup:kotlin-stdlib-jdk7:$version")
             )
             JpsLibrary(
-                "kotlin-stdlib-jdk8",
+                "kotlinc.kotlin-stdlib",
                 JpsLibrary.Kind.Maven(mavenIds.first(), excludes = listOf(MavenId("org.jetbrains", "annotations"))),
                 annotations = listOf(JpsUrl.File(JpsPath.ProjectDir("lib/annotations/kotlin", isCommunity))),
                 classes = mavenIds.map { JpsUrl.Jar(JpsPath.MavenRepository(it)) },

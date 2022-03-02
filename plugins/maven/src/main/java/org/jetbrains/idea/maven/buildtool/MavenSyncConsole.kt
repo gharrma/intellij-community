@@ -253,14 +253,15 @@ class MavenSyncConsole(private val myProject: Project) {
   }
 
   private fun createMessageEvent(e: Throwable): MessageEventImpl {
-    if (e is CannotStartServerException) {
-      val cause = ExceptionUtil.findCause(e, ExecutionException::class.java)
+    val csse = ExceptionUtil.findCause(e, CannotStartServerException::class.java)
+    if (csse != null) {
+      val cause = ExceptionUtil.findCause(csse, ExecutionException::class.java)
       if (cause != null) {
         return MessageEventImpl(mySyncId, MessageEvent.Kind.ERROR, SyncBundle.message("build.event.title.internal.server.error"),
                                 getExceptionText(cause), getExceptionText(cause))
       } else {
         return MessageEventImpl(mySyncId, MessageEvent.Kind.ERROR, SyncBundle.message("build.event.title.internal.server.error"),
-                                getExceptionText(e), getExceptionText(e))
+                                getExceptionText(csse), getExceptionText(csse))
       }
     }
     return MessageEventImpl(mySyncId, MessageEvent.Kind.ERROR, SyncBundle.message("build.event.title.error"),
@@ -325,6 +326,14 @@ class MavenSyncConsole(private val myProject: Project) {
     val buildIssue = DownloadArtifactBuildIssue.getIssue(errorString, quickFix)
     mySyncView.onEvent(mySyncId, BuildIssueEventImpl(umbrellaString, buildIssue, MessageEvent.Kind.ERROR))
     addText(mySyncId, errorString, false)
+  }
+
+  @Synchronized
+  private fun showBuildIssueNode(key: String, buildIssue: BuildIssue) = doIfImportInProcess {
+    hasErrors = true
+    hasUnresolved = true
+    startTask(mySyncId, key)
+    mySyncView.onEvent(mySyncId, BuildIssueEventImpl(key, buildIssue, MessageEvent.Kind.ERROR))
   }
 
   @Synchronized
@@ -479,8 +488,12 @@ class MavenSyncConsole(private val myProject: Project) {
       showError(keyPrefix, dependency)
     }
 
-    override fun showBuildIssue(dependency: String,  quickFix: BuildIssueQuickFix) {
+    override fun showBuildIssue(dependency: String, quickFix: BuildIssueQuickFix) {
       showBuildIssue(keyPrefix, dependency, quickFix)
+    }
+
+    override fun showBuildIssue(dependency: String, buildIssue: BuildIssue) {
+      showBuildIssueNode(keyPrefix, buildIssue)
     }
   }
 
@@ -493,6 +506,7 @@ class MavenSyncConsole(private val myProject: Project) {
 interface ArtifactSyncListener {
   fun showError(dependency: String)
   fun showBuildIssue(dependency: String,  quickFix: BuildIssueQuickFix)
+  fun showBuildIssue(dependency: String,  buildIssue: BuildIssue)
   fun downloadStarted(dependency: String)
   fun downloadCompleted(dependency: String)
   fun downloadFailed(dependency: String, error: String, stackTrace: String?)

@@ -23,6 +23,8 @@ import com.intellij.ui.dsl.UiDslException
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.dsl.builder.Cell
 import com.intellij.ui.dsl.builder.Row
+import com.intellij.ui.dsl.builder.components.DslLabel
+import com.intellij.ui.dsl.builder.components.DslLabelType
 import com.intellij.ui.dsl.builder.components.SegmentedButtonAction
 import com.intellij.ui.dsl.builder.components.SegmentedButtonToolbar
 import com.intellij.ui.dsl.gridLayout.Gaps
@@ -251,23 +253,22 @@ internal class RowImpl(private val dialogPanelConfig: DialogPanelConfig,
   }
 
   override fun label(text: String): CellImpl<JLabel> {
-    val result = Label(text)
-    result.putClientProperty(DslComponentProperty.LABEL, true)
-    return cell(result)
+    return cell(Label(text))
   }
 
-  override fun labelHtml(text: String, action: HyperlinkEventAction): Cell<JEditorPane> {
-    return cell(createHtml(text, action))
+  override fun text(@NlsContexts.Label text: String, maxLineLength: Int, action: HyperlinkEventAction): Cell<JEditorPane> {
+    val dslLabel = DslLabel(DslLabelType.LABEL)
+    dslLabel.action = action
+    dslLabel.setHtmlText(text, maxLineLength)
+    return cell(dslLabel)
   }
 
-  override fun comment(text: String, maxLineLength: Int, action: HyperlinkEventAction): CellImpl<JLabel> {
-    val comment = createComment(text, maxLineLength, action)
-    return cell(comment)
+  override fun comment(comment: String, maxLineLength: Int, action: HyperlinkEventAction): CellImpl<JEditorPane> {
+    return cell(createComment(comment, maxLineLength, action))
   }
 
-  override fun commentNoWrap(text: String): CellImpl<JLabel> {
-    val comment = createCommentNoWrap(text)
-    return cell(comment)
+  override fun commentHtml(text: String, action: HyperlinkEventAction): Cell<JEditorPane> {
+    return comment(text, MAX_LINE_LENGTH_WORD_WRAP, action)
   }
 
   override fun link(text: String, action: (ActionEvent) -> Unit): CellImpl<ActionLink> {

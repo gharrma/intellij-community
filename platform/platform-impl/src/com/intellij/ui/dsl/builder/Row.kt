@@ -12,7 +12,6 @@ import com.intellij.openapi.observable.properties.GraphProperty
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.ComboBox
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
-import com.intellij.openapi.ui.panel.ComponentPanelBuilder
 import com.intellij.openapi.util.NlsContexts
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.ui.JBIntSpinner
@@ -99,11 +98,15 @@ interface Row {
   fun resizableRow(): Row
 
   /**
-   * Adds comment after the row. Visibility and enabled state of the row affects row comment as well.
-   * [comment] can contain html tags except <html>, which is added automatically in this method
+   * Adds comment after the row with appropriate color and font size (macOS uses smaller font).
+   * [comment] can contain html tags except <html>, which is added automatically in this method.
+   * Visibility and enabled state of the row affects row comment as well.
+   *
+   * @see MAX_LINE_LENGTH_WORD_WRAP
+   * @see MAX_LINE_LENGTH_NO_WRAP
    */
   fun rowComment(@NlsContexts.DetailedDescription comment: String,
-                 maxLineLength: Int = ComponentPanelBuilder.MAX_COMMENT_WIDTH,
+                 maxLineLength: Int = DEFAULT_COMMENT_WIDTH,
                  action: HyperlinkEventAction = HyperlinkEventAction.HTML_HYPERLINK_INSTANCE): Row
 
   fun <T : JComponent> cell(component: T, viewComponent: JComponent = component): Cell<T>
@@ -177,16 +180,32 @@ interface Row {
    */
   fun label(@NlsContexts.Label text: String): Cell<JLabel>
 
-  fun labelHtml(@NlsContexts.Label text: String,
-                action: HyperlinkEventAction = HyperlinkEventAction.HTML_HYPERLINK_INSTANCE): Cell<JEditorPane>
+  /**
+   * Adds text. [text] can contain html tags except <html>, which is added automatically in this method.
+   * It is preferable to use [label] method for short plain single-lined strings because labels use less resources and simpler
+   *
+   * @see DEFAULT_COMMENT_WIDTH
+   * @see MAX_LINE_LENGTH_WORD_WRAP
+   * @see MAX_LINE_LENGTH_NO_WRAP
+   */
+  fun text(@NlsContexts.Label text: String, maxLineLength: Int = MAX_LINE_LENGTH_WORD_WRAP,
+           action: HyperlinkEventAction = HyperlinkEventAction.HTML_HYPERLINK_INSTANCE): Cell<JEditorPane>
 
   /**
-   * Adds comment. [text] can contain html tags except <html>, which is added automatically in this method
+   * Adds comment with appropriate color and font size (macOS uses smaller font).
+   * [comment] can contain html tags except <html>, which is added automatically in this method
+   *
+   * @see DEFAULT_COMMENT_WIDTH
+   * @see MAX_LINE_LENGTH_WORD_WRAP
+   * @see MAX_LINE_LENGTH_NO_WRAP
    */
-  fun comment(@NlsContexts.DetailedDescription text: String, maxLineLength: Int = -1,
-              action: HyperlinkEventAction = HyperlinkEventAction.HTML_HYPERLINK_INSTANCE): Cell<JLabel>
+  fun comment(@NlsContexts.DetailedDescription comment: String, maxLineLength: Int = MAX_LINE_LENGTH_WORD_WRAP,
+              action: HyperlinkEventAction = HyperlinkEventAction.HTML_HYPERLINK_INSTANCE): Cell<JEditorPane>
 
-  fun commentNoWrap(@NlsContexts.DetailedDescription text: String): Cell<JLabel>
+  @Deprecated("Use comment(...) instead")
+  @ApiStatus.ScheduledForRemoval(inVersion = "2022.2")
+  fun commentHtml(@NlsContexts.DetailedDescription text: String,
+                  action: HyperlinkEventAction = HyperlinkEventAction.HTML_HYPERLINK_INSTANCE): Cell<JEditorPane>
 
   /**
    * Creates focusable link with text inside. Should not be used with html in [text]

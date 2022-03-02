@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.kotlin.jps.build;
 
@@ -144,6 +144,39 @@ public abstract class IncrementalJvmJpsTestGenerated extends AbstractIncremental
         @TestMetadata("twoDependants")
         public void testTwoDependants() throws Exception {
             runTest("testData/incremental/multiModule/common/twoDependants/");
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("testData/incremental/multiModule/jvm")
+    public static class Jvm extends AbstractIncrementalJvmJpsTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("circular")
+        public void testCircular() throws Exception {
+            runTest("testData/incremental/multiModule/jvm/circular/");
+        }
+
+        @TestMetadata("circularDependencyClasses")
+        public void testCircularDependencyClasses() throws Exception {
+            runTest("testData/incremental/multiModule/jvm/circularDependencyClasses/");
+        }
+
+        @TestMetadata("circularDependencySamePackageUnchanged")
+        public void testCircularDependencySamePackageUnchanged() throws Exception {
+            runTest("testData/incremental/multiModule/jvm/circularDependencySamePackageUnchanged/");
+        }
+
+        @TestMetadata("circularDependencyTopLevelFunctions")
+        public void testCircularDependencyTopLevelFunctions() throws Exception {
+            runTest("testData/incremental/multiModule/jvm/circularDependencyTopLevelFunctions/");
+        }
+
+        @TestMetadata("circularDependencyWithAccessToInternal")
+        public void testCircularDependencyWithAccessToInternal() throws Exception {
+            runTest("testData/incremental/multiModule/jvm/circularDependencyWithAccessToInternal/");
         }
     }
 
@@ -894,6 +927,11 @@ public abstract class IncrementalJvmJpsTestGenerated extends AbstractIncremental
             @TestMetadata("changeSignatureStatic")
             public void testChangeSignatureStatic() throws Exception {
                 runTest("testData/incremental/withJava/javaUsedInKotlin/changeSignatureStatic/");
+            }
+
+            @TestMetadata("constantChanged")
+            public void testConstantChanged() throws Exception {
+                runTest("testData/incremental/withJava/javaUsedInKotlin/constantChanged/");
             }
 
             @TestMetadata("constantUnchanged")

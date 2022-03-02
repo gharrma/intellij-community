@@ -112,7 +112,6 @@ class KotlinPluginBuilder {
     "kotlinc.kotlinx-serialization-compiler-plugin",
     "kotlinc.parcelize-compiler-plugin",
     "kotlin-script-runtime",
-    "kotlinc.kotlin-scripting-compiler",
     "kotlinc.kotlin-scripting-compiler-impl",
     "kotlinc.kotlin-scripting-common",
     "kotlinc.kotlin-scripting-jvm",
@@ -159,12 +158,13 @@ class KotlinPluginBuilder {
       }
 
       if (isUltimate && kind == KotlinPluginKind.IJ) {
-        withModule("kotlin-ultimate.common-native")
-        withModule("kotlin-ultimate.common-noncidr-native")
-        withModule("kotlin-ultimate.javascript.debugger")
-        withModule("kotlin-ultimate.javascript.nodeJs")
-        withModule("kotlin-ultimate.ultimate-plugin")
-        withModule("kotlin-ultimate.ultimate-native")
+        // Do not pack ultimate part till the KTIJ-20799 is fixed
+        //withModule("kotlin-ultimate.common-native")
+        //withModule("kotlin-ultimate.common-noncidr-native")
+        //withModule("kotlin-ultimate.javascript.debugger")
+        //withModule("kotlin-ultimate.javascript.nodeJs")
+        //withModule("kotlin-ultimate.ultimate-plugin")
+        //withModule("kotlin-ultimate.ultimate-native")
       }
 
       if (kind == KotlinPluginKind.AC_KMM) {
@@ -214,20 +214,20 @@ class KotlinPluginBuilder {
       String jpsPluginJar = "jps/kotlin-jps-plugin.jar"
       withModule("kotlin.jps-plugin", jpsPluginJar)
 
-      String kotlincKotlinCompiler = "kotlinc.kotlin-compiler"
-      withProjectLibrary(kotlincKotlinCompiler, ProjectLibraryData.PackMode.STANDALONE_SEPARATE)
+      String kotlincKotlinCompilerCommon = "kotlinc.kotlin-compiler-common"
+      withProjectLibrary(kotlincKotlinCompilerCommon, ProjectLibraryData.PackMode.STANDALONE_SEPARATE)
 
       withModuleOutputPatches(MAIN_KOTLIN_PLUGIN_MODULE, new ResourcesGenerator() {
         @Override
         File generateResources(BuildContext context) {
-          JpsLibrary library = context.project.libraryCollection.findLibrary(kotlincKotlinCompiler)
+          JpsLibrary library = context.project.libraryCollection.findLibrary(kotlincKotlinCompilerCommon)
           List<File> jars = library.getFiles(JpsOrderRootType.COMPILED)
           if (jars.size() != 1) {
-            throw new IllegalStateException("$kotlincKotlinCompiler is expected to have only one jar")
+            throw new IllegalStateException("$kotlincKotlinCompilerCommon is expected to have only one jar")
           }
-          def extractedDir = context.paths.tempDir.resolve("$kotlincKotlinCompiler-extracted")
+          def extractedDir = context.paths.tempDir.resolve("$kotlincKotlinCompilerCommon-extracted")
           new Decompressor.Zip(jars[0]).extract(extractedDir)
-          def compilerExtensions = context.paths.tempDir.resolve("$kotlincKotlinCompiler-compiler-extensions")
+          def compilerExtensions = context.paths.tempDir.resolve("$kotlincKotlinCompilerCommon-compiler-extensions")
           def prefix = "META-INF/extensions"
           compilerExtensions.resolve(prefix).toFile().mkdirs()
           for (File file : extractedDir.resolve(prefix).toFile().listFiles()) {
@@ -237,11 +237,14 @@ class KotlinPluginBuilder {
         }
       })
 
+      withProjectLibrary("kotlinc.kotlin-compiler-fe10")
+      withProjectLibrary("kotlinc.kotlin-compiler-ir")
+
       withModule("kotlin.jps-common", "kotlin-jps-common.jar")
       withModule("kotlin.common", "kotlin-common.jar")
 
-      withProjectLibrary("kotlin-reflect", ProjectLibraryData.PackMode.STANDALONE_MERGED)
-      withProjectLibrary("kotlin-stdlib-jdk8", ProjectLibraryData.PackMode.STANDALONE_MERGED)
+      withProjectLibrary("kotlinc.kotlin-reflect", ProjectLibraryData.PackMode.STANDALONE_MERGED)
+      withProjectLibrary("kotlinc.kotlin-stdlib", ProjectLibraryData.PackMode.STANDALONE_MERGED)
       withProjectLibrary("javaslang")
       withProjectLibrary("kotlinx-collections-immutable-jvm")
       withProjectLibrary("javax-inject")
@@ -277,12 +280,19 @@ class KotlinPluginBuilder {
             if (kotlinVersion == null) {
               throw new IllegalStateException("Can't determine Kotlin compiler version")
             }
-            return "${major}-${kotlinVersion}-${kind}${minor}"
-          } else {
-            // Build number isn't recognized as IJ build number then it means build
-            // number must be plain Kotlin plugin version which we can use directly
-            return buildNumber
+            String version = "${major}-${kotlinVersion}-${kind}${minor}"
+            context.messages.info("version: $version")
+            return version
           }
+          // Build number isn't recognized as IJ build number then it means build
+          // number must be plain Kotlin plugin version (build configuration in kt-branch)
+          if (buildNumber.contains("IJ")) {
+            String version = buildNumber.replace("IJ", kind.toString())
+            context.messages.info("Kotlin plugin IJ version: $version")
+            return version
+          }
+
+          throw new IllegalStateException("Can't parse build number: $buildNumber")
         }
       })
 

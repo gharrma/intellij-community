@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.kotlin.idea.debugger.test;
 
@@ -236,6 +236,16 @@ public abstract class KotlinEvaluateExpressionWithIRFragmentCompilerTestGenerate
             runTest("testData/evaluation/singleBreakpoint/inlineFunctionBreakpointVariants.kt");
         }
 
+        @TestMetadata("inlineFunctionDeepInlining.kt")
+        public void testInlineFunctionDeepInlining() throws Exception {
+            runTest("testData/evaluation/singleBreakpoint/inlineFunctionDeepInlining.kt");
+        }
+
+        @TestMetadata("inlineFunctionDeepInliningSameFile.kt")
+        public void testInlineFunctionDeepInliningSameFile() throws Exception {
+            runTest("testData/evaluation/singleBreakpoint/inlineFunctionDeepInliningSameFile.kt");
+        }
+
         @TestMetadata("inlineMethodsInSignature.kt")
         public void testInlineMethodsInSignature() throws Exception {
             runTest("testData/evaluation/singleBreakpoint/inlineMethodsInSignature.kt");
@@ -436,6 +446,11 @@ public abstract class KotlinEvaluateExpressionWithIRFragmentCompilerTestGenerate
             runTest("testData/evaluation/singleBreakpoint/privatePropertyWithExplicitDefaultGetter.kt");
         }
 
+        @TestMetadata("privatePropertyWithNonDefaultAccessor.kt")
+        public void testPrivatePropertyWithNonDefaultAccessor() throws Exception {
+            runTest("testData/evaluation/singleBreakpoint/privatePropertyWithNonDefaultAccessor.kt");
+        }
+
         @TestMetadata("protectedMember.kt")
         public void testProtectedMember() throws Exception {
             runTest("testData/evaluation/singleBreakpoint/protectedMember.kt");
@@ -499,6 +514,11 @@ public abstract class KotlinEvaluateExpressionWithIRFragmentCompilerTestGenerate
         @TestMetadata("unsafeCall.kt")
         public void testUnsafeCall() throws Exception {
             runTest("testData/evaluation/singleBreakpoint/unsafeCall.kt");
+        }
+
+        @TestMetadata("unusedTransitiveDependencies.kt")
+        public void testUnusedTransitiveDependencies() throws Exception {
+            runTest("testData/evaluation/singleBreakpoint/unusedTransitiveDependencies.kt");
         }
 
         @TestMetadata("valueParameterName.kt")
@@ -633,6 +653,11 @@ public abstract class KotlinEvaluateExpressionWithIRFragmentCompilerTestGenerate
                 @TestMetadata("outerMembersNoReflection.kt")
                 public void testOuterMembersNoReflection() throws Exception {
                     runTest("testData/evaluation/singleBreakpoint/compilingEvaluator/inaccessibleMembers/outerMembersNoReflection.kt");
+                }
+
+                @TestMetadata("privateAnnotationCompanionValue.kt")
+                public void testPrivateAnnotationCompanionValue() throws Exception {
+                    runTest("testData/evaluation/singleBreakpoint/compilingEvaluator/inaccessibleMembers/privateAnnotationCompanionValue.kt");
                 }
 
                 @TestMetadata("selfMembers.kt")

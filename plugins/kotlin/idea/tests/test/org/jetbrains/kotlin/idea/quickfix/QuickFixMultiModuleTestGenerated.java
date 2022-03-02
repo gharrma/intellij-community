@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.kotlin.idea.quickfix;
 
@@ -24,6 +24,11 @@ public abstract class QuickFixMultiModuleTestGenerated extends AbstractQuickFixM
     public static class AccessibilityChecker extends AbstractQuickFixMultiModuleTest {
         private void runTest(String testDataFilePath) throws Exception {
             KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("annotationOnClass")
+        public void testAnnotationOnClass() throws Exception {
+            runTest("testData/multiModuleQuickFix/accessibilityChecker/annotationOnClass/");
         }
 
         @TestMetadata("classPrimaryConstructor")
@@ -550,6 +555,11 @@ public abstract class QuickFixMultiModuleTestGenerated extends AbstractQuickFixM
             runTest("testData/multiModuleQuickFix/createExpect/class/");
         }
 
+        @TestMetadata("classWithAnnotation")
+        public void testClassWithAnnotation() throws Exception {
+            runTest("testData/multiModuleQuickFix/createExpect/classWithAnnotation/");
+        }
+
         @TestMetadata("classWithSuperClassAndTypeParameter")
         public void testClassWithSuperClassAndTypeParameter() throws Exception {
             runTest("testData/multiModuleQuickFix/createExpect/classWithSuperClassAndTypeParameter/");
@@ -1053,6 +1063,11 @@ public abstract class QuickFixMultiModuleTestGenerated extends AbstractQuickFixM
             runTest("testData/multiModuleQuickFix/other/addOperatorByExpect/");
         }
 
+        @TestMetadata("cancelMakeAbstractFromActual")
+        public void testCancelMakeAbstractFromActual() throws Exception {
+            runTest("testData/multiModuleQuickFix/other/cancelMakeAbstractFromActual/");
+        }
+
         @TestMetadata("convertActualEnumToSealedClass")
         public void testConvertActualEnumToSealedClass() throws Exception {
             runTest("testData/multiModuleQuickFix/other/convertActualEnumToSealedClass/");
@@ -1218,6 +1233,11 @@ public abstract class QuickFixMultiModuleTestGenerated extends AbstractQuickFixM
             runTest("testData/multiModuleQuickFix/other/importFunInCommon/");
         }
 
+        @TestMetadata("makeAbstractFromActual")
+        public void testMakeAbstractFromActual() throws Exception {
+            runTest("testData/multiModuleQuickFix/other/makeAbstractFromActual/");
+        }
+
         @TestMetadata("makeInlineFromExpect")
         public void testMakeInlineFromExpect() throws Exception {
             runTest("testData/multiModuleQuickFix/other/makeInlineFromExpect/");
@@ -1296,6 +1316,11 @@ public abstract class QuickFixMultiModuleTestGenerated extends AbstractQuickFixM
         @TestMetadata("movePropertyToConstructor")
         public void testMovePropertyToConstructor() throws Exception {
             runTest("testData/multiModuleQuickFix/other/movePropertyToConstructor/");
+        }
+
+        @TestMetadata("notMakeAbstractFromActual")
+        public void testNotMakeAbstractFromActual() throws Exception {
+            runTest("testData/multiModuleQuickFix/other/notMakeAbstractFromActual/");
         }
 
         @TestMetadata("orderHeader")

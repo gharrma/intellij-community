@@ -77,7 +77,6 @@ class CompilerArgumentsContentProspectorTest {
             CommonCompilerArguments::noCheckActual,
             CommonCompilerArguments::newInference,
             CommonCompilerArguments::inlineClasses,
-            CommonCompilerArguments::polymorphicSignature,
             CommonCompilerArguments::legacySmartCastAfterTry,
             CommonCompilerArguments::effectSystem,
             CommonCompilerArguments::enableBuilderInference,
@@ -88,6 +87,7 @@ class CompilerArgumentsContentProspectorTest {
             CommonCompilerArguments::builtInsFromSources,
             CommonCompilerArguments::listPhases,
             CommonCompilerArguments::profilePhases,
+            CommonCompilerArguments::normalizeAbsolutePath,
             CommonCompilerArguments::checkPhaseConditions,
             CommonCompilerArguments::checkStickyPhaseConditions,
             CommonCompilerArguments::useFir,
@@ -99,7 +99,8 @@ class CompilerArgumentsContentProspectorTest {
             CommonCompilerArguments::extendedCompilerChecks,
             CommonCompilerArguments::disableDefaultScriptingPlugin,
             CommonCompilerArguments::inferenceCompatibility,
-            CommonCompilerArguments::suppressVersionWarnings
+            CommonCompilerArguments::suppressVersionWarnings,
+            CommonCompilerArguments::contextReceivers,
         )
 
         private val commonCompilerArgumentsStringProperties = listOf(
@@ -129,6 +130,7 @@ class CompilerArgumentsContentProspectorTest {
             CommonCompilerArguments::phasesToValidateBefore,
             CommonCompilerArguments::phasesToValidateAfter,
             CommonCompilerArguments::phasesToValidate,
+            CommonCompilerArguments::relativePathBases,
         )
 
         private val k2JVMCompilerArgumentsFlagProperties = commonCompilerArgumentsFlagProperties + listOf(
@@ -136,7 +138,6 @@ class CompilerArgumentsContentProspectorTest {
             K2JVMCompilerArguments::noJdk,
             K2JVMCompilerArguments::noStdlib,
             K2JVMCompilerArguments::noReflect,
-            K2JVMCompilerArguments::jvmDefaultAllowDisableAgainstAll,
             K2JVMCompilerArguments::javaParameters,
             K2JVMCompilerArguments::useIR,
             K2JVMCompilerArguments::useOldBackend,
@@ -145,20 +146,16 @@ class CompilerArgumentsContentProspectorTest {
             K2JVMCompilerArguments::noCallAssertions,
             K2JVMCompilerArguments::noReceiverAssertions,
             K2JVMCompilerArguments::noParamAssertions,
-            K2JVMCompilerArguments::strictJavaNullabilityAssertions,
             K2JVMCompilerArguments::noOptimize,
             K2JVMCompilerArguments::inheritMultifileParts,
             K2JVMCompilerArguments::useTypeTable,
             K2JVMCompilerArguments::validateBytecode,
             K2JVMCompilerArguments::validateIr,
-            K2JVMCompilerArguments::skipRuntimeVersionCheck,
             K2JVMCompilerArguments::useOldClassFilesReading,
-            K2JVMCompilerArguments::serializeIr,
             K2JVMCompilerArguments::singleModule,
             K2JVMCompilerArguments::suppressMissingBuiltinsError,
             K2JVMCompilerArguments::useJavac,
             K2JVMCompilerArguments::compileJava,
-            K2JVMCompilerArguments::noExceptionOnExplicitEqualsForBoxedNull,
             K2JVMCompilerArguments::disableStandardScript,
             K2JVMCompilerArguments::strictMetadataVersionSemantics,
             K2JVMCompilerArguments::suppressDeprecatedJvmTargetWarning,
@@ -171,7 +168,6 @@ class CompilerArgumentsContentProspectorTest {
             K2JVMCompilerArguments::noKotlinNothingValueException,
             K2JVMCompilerArguments::noResetJarTimestamps,
             K2JVMCompilerArguments::noUnifiedNullChecks,
-            K2JVMCompilerArguments::useOldSpilledVarTypeAnalysis,
             K2JVMCompilerArguments::useOldInlineClassesManglingScheme,
             K2JVMCompilerArguments::enableJvmPreview,
             K2JVMCompilerArguments::enhanceTypeParameterTypesToDefNotNull,
@@ -187,7 +183,6 @@ class CompilerArgumentsContentProspectorTest {
             K2JVMCompilerArguments::jvmTarget,
             K2JVMCompilerArguments::abiStability,
             K2JVMCompilerArguments::javaModulePath,
-            K2JVMCompilerArguments::constructorCallNormalizationMode,
             K2JVMCompilerArguments::assertionsMode,
             K2JVMCompilerArguments::buildFile,
             K2JVMCompilerArguments::declarationsOutputPath,
@@ -201,7 +196,8 @@ class CompilerArgumentsContentProspectorTest {
             K2JVMCompilerArguments::profileCompilerCommand,
             K2JVMCompilerArguments::repeatCompileModules,
             K2JVMCompilerArguments::lambdas,
-            K2JVMCompilerArguments::samConversions
+            K2JVMCompilerArguments::samConversions,
+            K2JVMCompilerArguments::serializeIr,
         )
 
         private val k2JVMCompilerArgumentsArrayArgumentProperties = commonCompilerArgumentsArrayProperties + listOf(
@@ -225,7 +221,7 @@ class CompilerArgumentsContentProspectorTest {
         )
         private val k2MetadataCompilerArgumentsArrayProperties = commonCompilerArgumentsArrayProperties + listOf(
             K2MetadataCompilerArguments::friendPaths,
-            K2MetadataCompilerArguments::refinesPaths
+            K2MetadataCompilerArguments::refinesPaths,
         )
         private val k2JSCompilerArgumentsFlagProperties = commonCompilerArgumentsFlagProperties + listOf(
             K2JSCompilerArguments::noStdlib,
@@ -237,9 +233,11 @@ class CompilerArgumentsContentProspectorTest {
             K2JSCompilerArguments::irDce,
             K2JSCompilerArguments::irDceDriven,
             K2JSCompilerArguments::irDcePrintReachabilityInfo,
+            K2JSCompilerArguments::irNewIr2Js,
             K2JSCompilerArguments::irPropertyLazyInitialization,
             K2JSCompilerArguments::irOnly,
             K2JSCompilerArguments::irPerModule,
+            K2JSCompilerArguments::irPerFile,
             K2JSCompilerArguments::generateDts,
             K2JSCompilerArguments::typedArrays,
             K2JSCompilerArguments::friendModulesDisabled,
@@ -250,8 +248,10 @@ class CompilerArgumentsContentProspectorTest {
             K2JSCompilerArguments::extensionFunctionsInExternals,
             K2JSCompilerArguments::irBaseClassInMetadata,
             K2JSCompilerArguments::irBuildCache,
-            K2JSCompilerArguments::irLegacyPropertyAccess,
             K2JSCompilerArguments::irSafeExternalBoolean,
+            K2JSCompilerArguments::partialLinkage,
+            K2JSCompilerArguments::wasmDebug,
+            K2JSCompilerArguments::wasmKClassFqn,
         )
         private val k2JSCompilerArgumentsStringProperties = commonCompilerArgumentsStringProperties + listOf(
             K2JSCompilerArguments::outputFile,
@@ -273,6 +273,7 @@ class CompilerArgumentsContentProspectorTest {
             K2JSCompilerArguments::cacheDirectories,
             K2JSCompilerArguments::irPerModuleOutputName,
             K2JSCompilerArguments::irSafeExternalBooleanDiagnostic,
+            K2JSCompilerArguments::wasmLauncher,
         )
         private val k2JSCompilerArgumentsArrayProperties = commonCompilerArgumentsArrayProperties
 

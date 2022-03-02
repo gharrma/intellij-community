@@ -24,8 +24,8 @@ import training.learn.course.KLesson
 import training.learn.exceptons.NoTextEditor
 import training.learn.lesson.LessonManager
 import training.statistic.StatisticBase
-import training.ui.LearnToolWindowFactory
 import training.util.WeakReferenceDelegator
+import training.util.getLearnToolWindowForProject
 import java.awt.Component
 import java.util.concurrent.CompletableFuture
 import kotlin.math.max
@@ -87,7 +87,7 @@ internal class LessonExecutor(val lesson: KLesson,
     private set
   private var currentVisualIndex = 1
 
-  private val parentDisposable: Disposable = LearnToolWindowFactory.learnWindowPerProject[project]?.parentDisposable ?: project
+  private val parentDisposable: Disposable = getLearnToolWindowForProject(project)?.parentDisposable ?: project
 
   internal val visualIndexNumber: Int get() = taskActions[currentTaskIndex].taskVisualIndex ?: 0
 
@@ -143,14 +143,16 @@ internal class LessonExecutor(val lesson: KLesson,
   }
 
   override fun dispose() {
-    if (!hasBeenStopped) {
-      ApplicationManager.getApplication().assertIsDispatchThread()
-      continueHighlighting.set(false)
-      clearRestore()
-      disposeRecorders()
-      hasBeenStopped = true
-      taskActions.clear()
-    }
+    if (hasBeenStopped) return
+    ApplicationManager.getApplication().assertIsDispatchThread()
+    val lessonPassed = currentTaskIndex == taskActions.size
+    val visualIndex = if(lessonPassed) currentVisualIndex else (taskActions[currentTaskIndex].taskVisualIndex ?: 0)
+    lesson.onStop(project, lessonPassed, currentTaskIndex, visualIndex)
+    continueHighlighting.set(false)
+    clearRestore()
+    disposeRecorders()
+    hasBeenStopped = true
+    taskActions.clear()
   }
 
   fun stopLesson() {
@@ -220,7 +222,6 @@ internal class LessonExecutor(val lesson: KLesson,
     ApplicationManager.getApplication().assertIsDispatchThread()
     if (currentTaskIndex == taskActions.size) {
       LessonManager.instance.passLesson(lesson)
-      disposeRecorders()
       return
     }
     val taskInfo = taskActions[currentTaskIndex]

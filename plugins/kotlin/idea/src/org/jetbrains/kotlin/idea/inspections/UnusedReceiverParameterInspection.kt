@@ -35,7 +35,7 @@ import org.jetbrains.kotlin.psi.psiUtil.hasActualModifier
 import org.jetbrains.kotlin.psi.typeRefHelpers.setReceiverTypeReference
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.calls.callUtil.getResolvedCall
+import org.jetbrains.kotlin.resolve.calls.util.getResolvedCall
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
 import org.jetbrains.kotlin.resolve.calls.model.VariableAsFunctionResolvedCall
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
@@ -165,7 +165,8 @@ class UnusedReceiverParameterInspection : AbstractKotlinInspection() {
 fun isUsageOfDescriptor(descriptor: DeclarationDescriptor, resolvedCall: ResolvedCall<*>, bindingContext: BindingContext): Boolean {
     // As receiver of call
     if (resolvedCall.dispatchReceiver.getThisReceiverOwner(bindingContext) == descriptor ||
-        resolvedCall.extensionReceiver.getThisReceiverOwner(bindingContext) == descriptor
+        resolvedCall.extensionReceiver.getThisReceiverOwner(bindingContext) == descriptor ||
+        resolvedCall.contextReceivers.any { it.getThisReceiverOwner(bindingContext) == descriptor }
     ) {
         return true
     }

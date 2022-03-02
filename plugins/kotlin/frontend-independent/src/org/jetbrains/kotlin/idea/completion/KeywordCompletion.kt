@@ -142,6 +142,26 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
         return keywordToken in nextKeywords
     }
 
+    private fun ignorePrefixForKeyword(completionPosition: PsiElement, keywordToken: KtKeywordToken): Boolean =
+        when (keywordToken) {
+            // it's needed to complete overrides that should work by member name too
+            OVERRIDE_KEYWORD -> true
+
+            // keywords that might be used with labels (@label) after them
+            THIS_KEYWORD,
+            RETURN_KEYWORD,
+            BREAK_KEYWORD,
+            CONTINUE_KEYWORD -> {
+                // If the position is parsed as an expression and has a label, it means that the completion is performed
+                // in a place like `return@la<caret>`. The prefix matcher in this case will have its prefix == "la",
+                // and it won't match with the keyword text ("return" in this case).
+                // That's why we want to ignore the prefix matcher for such positions
+                completionPosition is KtExpressionWithLabel && completionPosition.getTargetLabel() != null
+            }
+
+            else -> false
+        }
+
     private fun handleCompoundKeyword(
         position: PsiElement,
         keywordToken: KtKeywordToken,
@@ -177,7 +197,7 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
 
         if (keywordToken == DYNAMIC_KEYWORD && isJvmModule) return // not supported for JVM
 
-        if (keywordToken !in KEYWORDS_TO_IGNORE_PREFIX && !prefixMatcher.isStartMatch(keyword)) return
+        if (!ignorePrefixForKeyword(position, keywordToken) && !prefixMatcher.isStartMatch(keyword)) return
 
         if (!parserFilter(keywordToken)) return
 
@@ -434,7 +454,7 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
 
                 isErrorElementBefore(elementAt) -> return false
 
-                !isModifierSupportedAtLanguageLevel(keywordTokenType, languageVersionSettings) -> return false
+                !isModifierSupportedAtLanguageLevel(elementAt, keywordTokenType, languageVersionSettings) -> return false
 
                 (keywordTokenType == VAL_KEYWORD || keywordTokenType == VAR_KEYWORD) &&
                         elementAt.parent is KtParameter &&
@@ -558,12 +578,22 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
         }
     }
 
-    private fun isModifierSupportedAtLanguageLevel(keyword: KtKeywordToken, languageVersionSettings: LanguageVersionSettings): Boolean {
+    private fun isModifierSupportedAtLanguageLevel(
+        position: PsiElement,
+        keyword: KtKeywordToken,
+        languageVersionSettings: LanguageVersionSettings
+    ): Boolean {
         val feature = when (keyword) {
             TYPE_ALIAS_KEYWORD -> LanguageFeature.TypeAliases
             HEADER_KEYWORD, IMPL_KEYWORD -> return false
             EXPECT_KEYWORD, ACTUAL_KEYWORD -> LanguageFeature.MultiPlatformProjects
             SUSPEND_KEYWORD -> LanguageFeature.Coroutines
+            FIELD_KEYWORD -> {
+                if (!position.isExplicitBackingFieldDeclaration) return true
+
+                LanguageFeature.ExplicitBackingFields
+            }
+            CONTEXT_KEYWORD -> LanguageFeature.ContextReceivers
             else -> return true
         }
         return languageVersionSettings.supportsFeature(feature)
@@ -662,4 +692,7 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
 
         return true
     }
+
+    private val PsiElement.isExplicitBackingFieldDeclaration
+        get() = parent is KtBackingField
 }

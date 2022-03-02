@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.uast.test.kotlin.comparison;
 
@@ -21,6 +21,11 @@ import org.junit.runner.RunWith;
 public class FE1UastDeclarationTestGenerated extends AbstractFE1UastDeclarationTest {
     private void runTest(String testDataFilePath) throws Exception {
         KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+    }
+
+    @TestMetadata("annotationOnElvis.kt")
+    public void testAnnotationOnElvis() throws Exception {
+        runTest("../../uast-kotlin-fir/testData/declaration/annotationOnElvis.kt");
     }
 
     @TestMetadata("doWhile.kt")
@@ -51,5 +56,10 @@ public class FE1UastDeclarationTestGenerated extends AbstractFE1UastDeclarationT
     @TestMetadata("objects.kt")
     public void testObjects() throws Exception {
         runTest("../../uast-kotlin-fir/testData/declaration/objects.kt");
+    }
+
+    @TestMetadata("retention.kt")
+    public void testRetention() throws Exception {
+        runTest("../../uast-kotlin-fir/testData/declaration/retention.kt");
     }
 }

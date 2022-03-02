@@ -22,7 +22,7 @@ open class AddModifierFix(
     override fun getText(): String {
         val element = element ?: return ""
         if (modifier in modalityModifiers || modifier in KtTokens.VISIBILITY_MODIFIERS || modifier == KtTokens.CONST_KEYWORD) {
-            return KotlinBundle.message("fix.add.modifier.text", RemoveModifierFix.getElementName(element), modifier.value)
+            return KotlinBundle.message("fix.add.modifier.text", RemoveModifierFixBase.getElementName(element), modifier.value)
         }
         return KotlinBundle.message("fix.add.modifier.text.generic", modifier.value)
     }
@@ -50,7 +50,7 @@ open class AddModifierFix(
     //  FIR version of [org.jetbrains.kotlin.idea.refactoring.KotlinRefactoringUtilKt#canRefactor]
     override fun isAvailableImpl(project: Project, editor: Editor?, file: PsiFile): Boolean = element != null
 
-    interface Factory<T> {
+    interface Factory<T : AddModifierFix> {
         fun createFactory(modifier: KtModifierKeywordToken): QuickFixesPsiBasedFactory<PsiElement> {
             return createFactory(modifier, KtModifierListOwner::class.java)
         }
@@ -93,7 +93,7 @@ open class AddModifierFix(
                     }
                 }
             }
-            return AddModifierFix(modifierListOwner, modifier)
+            return createModifierFix(modifierListOwner, modifier)
         }
 
         fun createModifierFix(
@@ -110,8 +110,9 @@ open class AddModifierFix(
         val addInnerModifier = createFactory(KtTokens.INNER_KEYWORD)
         val addOverrideModifier = createFactory(KtTokens.OVERRIDE_KEYWORD)
 
-        private val modalityModifiers: Set<KtModifierKeywordToken> =
-            setOf(KtTokens.ABSTRACT_KEYWORD, KtTokens.OPEN_KEYWORD, KtTokens.FINAL_KEYWORD)
+        val modifiersWithWarning = setOf(KtTokens.ABSTRACT_KEYWORD, KtTokens.FINAL_KEYWORD)
+
+        private val modalityModifiers = modifiersWithWarning + KtTokens.OPEN_KEYWORD
 
         override fun createModifierFix(element: KtModifierListOwner, modifier: KtModifierKeywordToken): AddModifierFix =
             AddModifierFix(element, modifier)

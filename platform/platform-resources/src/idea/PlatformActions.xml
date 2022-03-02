@@ -788,20 +788,6 @@
           <action id="ConfigureEditorTabs" class="com.intellij.ide.actions.ConfigureEditorTabsAction"/>
         </group>
 
-        <group id="EditorTabsEntryPoint" popup="true" icon="AllIcons.Actions.More">
-          <reference id="RecentFiles"/>
-          <reference id="RecentLocations"/>
-          <separator/>
-          <reference id="CloseAllEditors"/>
-          <reference id="ReopenClosedTab"/>
-          <separator/>
-          <reference id="Unsplit"/>
-          <reference id="UnsplitAll"/>
-          <reference id="ChangeSplitOrientation"/>
-          <separator/>
-          <reference id="ConfigureEditorTabs"/>
-        </group>
-
         <group id="Notifications" popup="true">
           <action class="com.intellij.ui.CloseFirstNotificationAction" id="CloseFirstNotification"/>
           <action class="com.intellij.ui.CloseAllNotificationsAction" id="CloseAllNotifications"/>
@@ -865,6 +851,20 @@
       </group>
 
       <group id="OtherMenu" class="com.intellij.ide.actions.NonEmptyActionGroup"/>
+    </group>
+
+    <group id="EditorTabsEntryPoint" popup="true" icon="AllIcons.Actions.More">
+      <reference id="RecentFiles"/>
+      <reference id="RecentLocations"/>
+      <separator/>
+      <reference id="CloseAllEditors"/>
+      <reference id="ReopenClosedTab"/>
+      <separator/>
+      <reference id="Unsplit"/>
+      <reference id="UnsplitAll"/>
+      <reference id="ChangeSplitOrientation"/>
+      <separator/>
+      <reference id="ConfigureEditorTabs"/>
     </group>
 
     <group id="MainToolBar">
@@ -1098,7 +1098,6 @@
       <separator/>
       <action internal="true" id="ReloadProjectAction" class="com.intellij.internal.ReloadProjectAction"/>
       <group id="Internal.Trust" popup="true">
-        <action id="UnsureProject" internal="true" class="com.intellij.internal.UnsureTrustAction"/>
         <action id="TrustProject" internal="true" class="com.intellij.internal.YesTrustAction"/>
         <action id="UntrustProject" internal="true" class="com.intellij.internal.NoTrustAction"/>
       </group>

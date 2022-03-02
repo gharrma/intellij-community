@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.kotlin.idea.imports;
 
@@ -286,6 +286,11 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
             runTest("testData/editor/optimizeImports/common/Companion.kt");
         }
 
+        @TestMetadata("CompanionExtensionFunctionReference.kt")
+        public void testCompanionExtensionFunctionReference() throws Exception {
+            runTest("testData/editor/optimizeImports/common/CompanionExtensionFunctionReference.kt");
+        }
+
         @TestMetadata("CompanionFunction.kt")
         public void testCompanionFunction() throws Exception {
             runTest("testData/editor/optimizeImports/common/CompanionFunction.kt");
@@ -426,9 +431,19 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
             runTest("testData/editor/optimizeImports/common/MembersInScope.kt");
         }
 
+        @TestMetadata("NestedClassConstructorReferenceThroughTopLevelClass.kt")
+        public void testNestedClassConstructorReferenceThroughTopLevelClass() throws Exception {
+            runTest("testData/editor/optimizeImports/common/NestedClassConstructorReferenceThroughTopLevelClass.kt");
+        }
+
         @TestMetadata("NestedClassReferenceOutsideClassBody.kt")
         public void testNestedClassReferenceOutsideClassBody() throws Exception {
             runTest("testData/editor/optimizeImports/common/NestedClassReferenceOutsideClassBody.kt");
+        }
+
+        @TestMetadata("NestedClassReferenceThroughTopLevelClass.kt")
+        public void testNestedClassReferenceThroughTopLevelClass() throws Exception {
+            runTest("testData/editor/optimizeImports/common/NestedClassReferenceThroughTopLevelClass.kt");
         }
 
         @TestMetadata("Overloads.kt")
@@ -489,6 +504,99 @@ public abstract class JvmOptimizeImportsTestGenerated extends AbstractJvmOptimiz
         @TestMetadata("WithAlias2.kt")
         public void testWithAlias2() throws Exception {
             runTest("testData/editor/optimizeImports/common/WithAlias2.kt");
+        }
+
+        @RunWith(JUnit3RunnerWithInners.class)
+        @TestMetadata("testData/editor/optimizeImports/common/basic")
+        public static class Basic extends AbstractJvmOptimizeImportsTest {
+            private void runTest(String testDataFilePath) throws Exception {
+                KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+            }
+
+            @TestMetadata("UnusedClass.kt")
+            public void testUnusedClass() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UnusedClass.kt");
+            }
+
+            @TestMetadata("UnusedExtensionFunction.kt")
+            public void testUnusedExtensionFunction() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UnusedExtensionFunction.kt");
+            }
+
+            @TestMetadata("UnusedExtensionProperty.kt")
+            public void testUnusedExtensionProperty() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UnusedExtensionProperty.kt");
+            }
+
+            @TestMetadata("UnusedFunction.kt")
+            public void testUnusedFunction() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UnusedFunction.kt");
+            }
+
+            @TestMetadata("UnusedProperty.kt")
+            public void testUnusedProperty() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UnusedProperty.kt");
+            }
+
+            @TestMetadata("UnusedStarImport.kt")
+            public void testUnusedStarImport() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UnusedStarImport.kt");
+            }
+
+            @TestMetadata("UsedClass.kt")
+            public void testUsedClass() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedClass.kt");
+            }
+
+            @TestMetadata("UsedClassWithAlias.kt")
+            public void testUsedClassWithAlias() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedClassWithAlias.kt");
+            }
+
+            @TestMetadata("UsedConstructor.kt")
+            public void testUsedConstructor() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedConstructor.kt");
+            }
+
+            @TestMetadata("UsedExtensionFunction.kt")
+            public void testUsedExtensionFunction() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedExtensionFunction.kt");
+            }
+
+            @TestMetadata("UsedExtensionFunctionImplicitReceiver.kt")
+            public void testUsedExtensionFunctionImplicitReceiver() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedExtensionFunctionImplicitReceiver.kt");
+            }
+
+            @TestMetadata("UsedExtensionProperty.kt")
+            public void testUsedExtensionProperty() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedExtensionProperty.kt");
+            }
+
+            @TestMetadata("UsedFunction.kt")
+            public void testUsedFunction() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedFunction.kt");
+            }
+
+            @TestMetadata("UsedFunctionReference.kt")
+            public void testUsedFunctionReference() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedFunctionReference.kt");
+            }
+
+            @TestMetadata("UsedProperty.kt")
+            public void testUsedProperty() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedProperty.kt");
+            }
+
+            @TestMetadata("UsedStarImport.kt")
+            public void testUsedStarImport() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedStarImport.kt");
+            }
+
+            @TestMetadata("UsedTypeQualifierWithAlias.kt")
+            public void testUsedTypeQualifierWithAlias() throws Exception {
+                runTest("testData/editor/optimizeImports/common/basic/UsedTypeQualifierWithAlias.kt");
+            }
         }
 
         @RunWith(JUnit3RunnerWithInners.class)

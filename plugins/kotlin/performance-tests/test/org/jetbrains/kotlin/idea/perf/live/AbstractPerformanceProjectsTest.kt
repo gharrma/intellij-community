@@ -24,6 +24,7 @@ import com.intellij.util.ThrowableRunnable
 import com.intellij.util.indexing.UnindexedFilesUpdater
 import com.intellij.util.ui.UIUtil
 import org.jetbrains.kotlin.idea.core.script.ScriptConfigurationManager
+import org.jetbrains.kotlin.idea.perf.PerfTestSettingsOverride
 import org.jetbrains.kotlin.idea.perf.ProjectBuilder
 import org.jetbrains.kotlin.idea.perf.Stats
 import org.jetbrains.kotlin.idea.perf.Stats.Companion.WARM_UP
@@ -246,6 +247,7 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
         revertChangesAtTheEnd: Boolean = true,
         note: String = "",
         stopAtException: Boolean = false,
+        overrides: List<PerfTestSettingsOverride<Unit, Array<LookupElement>>> = emptyList(),
     ) = perfTypeAndAutocomplete(
         project = project(),
         stats = stats,
@@ -259,6 +261,7 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
         revertChangesAtTheEnd = revertChangesAtTheEnd,
         note = note,
         stopAtException = stopAtException,
+        overrides = overrides,
     )
 
     fun perfTypeAndAutocomplete(
@@ -274,8 +277,8 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
         revertChangesAtTheEnd: Boolean = true,
         note: String = "",
         stopAtException: Boolean = false,
+        overrides: List<PerfTestSettingsOverride<Unit, Array<LookupElement>>> = emptyList(),
     ) {
-        assertTrue("lookupElements has to be not empty", lookupElements.isNotEmpty())
         perfTypeAndDo(
             project,
             fileName,
@@ -286,6 +289,7 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
             typeAfterMarker,
             surroundItems,
             insertString,
+            overrides = overrides,
             setupBeforeTypingBlock = { fixture ->
                 if (highlightFileBeforeStartTyping) {
                     fixture.doHighlighting()
@@ -360,6 +364,7 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
         tearDownCheck: (Fixture, V?) -> Unit,
         revertChangesAtTheEnd: Boolean,
         stopAtException: Boolean = false,
+        overrides: List<PerfTestSettingsOverride<Unit, V>> = emptyList(),
     ) {
         openFixture(project, fileName).use { fixture ->
             val editor = fixture.editor
@@ -367,7 +372,7 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
             val initialText = editor.document.text
             updateScriptDependenciesIfNeeded(fileName, fixture)
 
-            performanceTest<Unit, V> {
+            performanceTest<Unit, V>(overrides) {
                 name("$typeTestPrefix ${notePrefix(note)}$fileName")
                 stats(stats)
                 warmUpIterations(8)
@@ -590,8 +595,23 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
         note: String = ""
     ): List<HighlightInfo> = perfHighlightFile(project(), name, stats, tools = tools, note = note)
 
-    protected fun perfHighlightFileEmptyProfile(name: String, stats: Stats, stopAtException: Boolean = false): List<HighlightInfo> =
-        perfHighlightFile(project(), name, stats, tools = emptyArray(), note = "empty profile", stopAtException = stopAtException)
+    protected fun perfHighlightFileEmptyProfile(
+        name: String,
+        stats: Stats,
+        stopAtException: Boolean = false,
+        tearDown: () -> Unit = {},
+        overrides: List<PerfTestSettingsOverride<EditorFile, List<HighlightInfo>>> = emptyList(),
+    ): List<HighlightInfo> =
+        perfHighlightFile(
+            project(),
+            name,
+            stats,
+            tools = emptyArray(),
+            note = "empty profile",
+            stopAtException = stopAtException,
+            tearDown = tearDown,
+            overrides = overrides,
+        )
 
     protected fun perfHighlightFile(
         project: Project,
@@ -603,7 +623,9 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
         iterations: Int = 10,
         checkStability: Boolean = true,
         stopAtException: Boolean = false,
-        filenameSimplifier: (String) -> String = ::simpleFilename
+        filenameSimplifier: (String) -> String = ::simpleFilename,
+        tearDown: () -> Unit = {},
+        overrides: List<PerfTestSettingsOverride<EditorFile, List<HighlightInfo>>> = emptyList(),
     ): List<HighlightInfo> {
         val profileManager = ProjectInspectionProfileManager.getInstance(project)
         val currentProfile = profileManager.currentProfile
@@ -614,7 +636,7 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
             return project.highlightFile {
                 val isWarmUp = note == WARM_UP
                 var highlightInfos: List<HighlightInfo> = emptyList()
-                performanceTest<EditorFile, List<HighlightInfo>> {
+                performanceTest<EditorFile, List<HighlightInfo>>(overrides) {
                     name("highlighting ${notePrefix(note)}${filenameSimplifier(fileName)}")
                     stats(stats)
                     warmUpIterations(if (isWarmUp) 1 else warmUpIterations)
@@ -635,6 +657,7 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
                             fileEditorManager.closeFile(editorFile.psiFile.virtualFile)
                         }
                         PsiManager.getInstance(project).dropPsiCaches()
+                        tearDown()
                     }
                     profilerConfig.enabled = true
                     stopAtException(stopAtException)
@@ -698,6 +721,10 @@ abstract class AbstractPerformanceProjectsTest : UsefulTestCase() {
     fun notePrefix(note: String) = if (note.isNotEmpty()) {
         if (note.endsWith("/")) note else "$note "
     } else ""
+}
 
-
+class PerformanceTestProfile(
+    val warmUpIterations: Int,
+    val iterations: Int,
+) {
 }

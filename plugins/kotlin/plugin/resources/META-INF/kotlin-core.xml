@@ -53,6 +53,12 @@
     <applicationService
             serviceInterface="org.jetbrains.kotlin.idea.references.ReadWriteAccessChecker"
             serviceImplementation="org.jetbrains.kotlin.idea.references.ReadWriteAccessCheckerDescriptorsImpl"/>
+    <applicationService
+            serviceInterface="org.jetbrains.kotlin.idea.base.KotlinPluginKindProvider"
+            serviceImplementation="org.jetbrains.kotlin.idea.fir.FirKotlinPluginKindProvider"/>
+    <applicationService
+            serviceInterface="org.jetbrains.kotlin.idea.completion.handlers.SmartCompletionTailOffsetProvider"
+            serviceImplementation="org.jetbrains.kotlin.idea.completion.handlers.SmartCompletionTailOffsetProviderFE10Impl"/>
 
     <projectService serviceImplementation="org.jetbrains.kotlin.idea.PluginStartupService"/>
     <projectService serviceImplementation="org.jetbrains.kotlin.idea.core.KotlinPluginDisposable"/>
@@ -351,6 +357,15 @@
     <tipAndTrick file="Kotlin_project.html"/>
     <tipAndTrick file="Kotlin_mix.html"/>
     <tipAndTrick file="Kotlin_Java_convert.html"/>
+  </extensions>
+
+  <!-- Notifications -->
+  <extensions defaultExtensionNs="com.intellij">
+    <notificationGroup
+            id="kotlin.external.compiler.updates"
+            displayType="STICKY_BALLOON"
+            key="kotlin.external.compiler.updates.notification.group.name"
+    />
   </extensions>
 
   <!-- Navigation -->

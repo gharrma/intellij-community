@@ -1,4 +1,4 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.openapi.wm.impl.content;
 
 import com.intellij.ide.IdeBundle;
@@ -405,8 +405,10 @@ public final class ToolWindowContentUi implements ContentUI, DataProvider {
       @Override
       public void mouseClicked(MouseEvent e) {
         if (SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 2) {
-          ToolWindowManagerEx manager = ui.window.getToolWindowManager();
-          manager.setMaximized(ui.window, !manager.isMaximized(ui.window));
+          if (ui.tabsLayout.myDoubleClickActions.isEmpty() || !(e.getComponent() instanceof ContentTabLabel)) {
+            ToolWindowManagerEx manager = ui.window.getToolWindowManager();
+            manager.setMaximized(ui.window, !manager.isMaximized(ui.window));
+          }
         }
       }
 
@@ -621,6 +623,9 @@ public final class ToolWindowContentUi implements ContentUI, DataProvider {
   public Object getData(@NotNull @NonNls String dataId) {
     if (PlatformDataKeys.TOOL_WINDOW.is(dataId)) {
       return window;
+    }
+    else if (PlatformCoreDataKeys.HELP_ID.is(dataId)) {
+      return window.getHelpId();
     }
     else if (CommonDataKeys.PROJECT.is(dataId)) {
       return window.getToolWindowManager().getProject();

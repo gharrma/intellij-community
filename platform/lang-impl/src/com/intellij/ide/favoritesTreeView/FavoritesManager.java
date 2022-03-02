@@ -1,7 +1,8 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.favoritesTreeView;
 
 import com.intellij.ide.IdeBundle;
+import com.intellij.ide.bookmark.BookmarksListener;
 import com.intellij.ide.favoritesTreeView.actions.AddToFavoritesAction;
 import com.intellij.ide.projectView.impl.*;
 import com.intellij.ide.projectView.impl.nodes.LibraryGroupElement;
@@ -40,7 +41,10 @@ import java.util.function.Function;
 import static com.intellij.ide.favoritesTreeView.FavoritesListProvider.EP_NAME;
 
 @Service
-@State(name = "FavoritesManager", storages = @Storage(StoragePathMacros.PRODUCT_WORKSPACE_FILE))
+@State(name = "FavoritesManager", storages = {
+  @Storage(StoragePathMacros.PRODUCT_WORKSPACE_FILE),
+  @Storage(value = StoragePathMacros.WORKSPACE_FILE, deprecated = true),
+})
 public final class FavoritesManager implements PersistentStateComponent<Element> {
   // fav list name -> list of (root: root url, root class)
   private final Map<String, List<TreeItem<Pair<AbstractUrl, String>>>> myName2FavoritesRoots = new TreeMap<>();
@@ -165,7 +169,14 @@ public final class FavoritesManager implements PersistentStateComponent<Element>
     listAdded(listName);
   }
 
+  /**
+   * @deprecated use {@link BookmarksListener#structureChanged} instead. For example,
+   * {@code myProject.getMessageBus().syncPublisher(BookmarksListener.TOPIC).structureChanged(node)}.
+   * The {@code null}-node can be used to rebuild the whole BookmarksView.
+   */
+  @Deprecated
   public synchronized void fireListeners(@NotNull final String listName) {
+    myProject.getMessageBus().syncPublisher(BookmarksListener.TOPIC).structureChanged(null);
     rootsChanged();
   }
 

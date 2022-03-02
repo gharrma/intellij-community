@@ -17,7 +17,7 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.types.Variance
 
-class RemoveModifierFix(
+open class RemoveModifierFixBase(
     element: KtModifierListOwner,
     private val modifier: KtModifierKeywordToken,
     private val isRedundant: Boolean
@@ -63,18 +63,6 @@ class RemoveModifierFix(
         val removeOpenModifier: QuickFixesPsiBasedFactory<PsiElement> = createRemoveModifierFromListOwnerPsiBasedFactory(KtTokens.OPEN_KEYWORD)
         val removePrivateModifier: QuickFixesPsiBasedFactory<PsiElement> = createRemoveModifierFromListOwnerPsiBasedFactory(KtTokens.PRIVATE_KEYWORD)
 
-        @Deprecated(
-            "For binary compatibility",
-            replaceWith = ReplaceWith("createRemoveModifierFromListOwnerPsiBasedFactory(modifier, isRedundant)")
-        )
-        fun createRemoveModifierFromListOwnerFactory(
-            modifier: KtModifierKeywordToken,
-            isRedundant: Boolean = false
-        ): KotlinSingleIntentionActionFactory =
-            KotlinSingleIntentionActionFactory.createFromQuickFixesPsiBasedFactory(
-                createRemoveModifierFromListOwnerPsiBasedFactory(modifier, isRedundant)
-            )
-
         fun createRemoveModifierFromListOwnerPsiBasedFactory(
             modifier: KtModifierKeywordToken,
             isRedundant: Boolean = false
@@ -84,11 +72,12 @@ class RemoveModifierFix(
                 isRedundant
             ).coMap { PsiTreeUtil.getParentOfType(it, KtModifierListOwner::class.java, false) }
 
+
         fun createRemoveModifierFromListOwnerFactoryByModifierListOwner(
             modifier: KtModifierKeywordToken,
             isRedundant: Boolean = false
         ) = quickFixesPsiBasedFactory<KtModifierListOwner> {
-            listOf(RemoveModifierFix(it, modifier, isRedundant))
+            listOf(RemoveModifierFixBase(it, modifier, isRedundant))
         }
 
         private fun createRemoveModifierFactory(isRedundant: Boolean = false): QuickFixesPsiBasedFactory<PsiElement> {
@@ -96,7 +85,7 @@ class RemoveModifierFix(
                 val elementType = psiElement.node.elementType as? KtModifierKeywordToken ?: return@quickFixesPsiBasedFactory emptyList()
                 val modifierListOwner = psiElement.getStrictParentOfType<KtModifierListOwner>()
                     ?: return@quickFixesPsiBasedFactory emptyList()
-                listOf(RemoveModifierFix(modifierListOwner, elementType, isRedundant))
+                listOf(RemoveModifierFixBase(modifierListOwner, elementType, isRedundant))
             }
         }
 
@@ -106,7 +95,7 @@ class RemoveModifierFix(
                 val projection = psiElement as KtTypeProjection
                 val elementType = projection.projectionToken?.node?.elementType as? KtModifierKeywordToken
                     ?: return@quickFixesPsiBasedFactory listOf()
-                listOf(RemoveModifierFix(projection, elementType, isRedundant))
+                listOf(RemoveModifierFixBase(projection, elementType, isRedundant))
             }
         }
 
@@ -118,7 +107,7 @@ class RemoveModifierFix(
                     Variance.OUT_VARIANCE -> KtTokens.OUT_KEYWORD
                     else -> return@quickFixesPsiBasedFactory emptyList()
                 }
-                listOf(RemoveModifierFix(psiElement, modifier, isRedundant = false))
+                listOf(RemoveModifierFixBase(psiElement, modifier, isRedundant = false))
             }
         }
 
@@ -127,7 +116,7 @@ class RemoveModifierFix(
                 val modifierList = psiElement.parent as KtDeclarationModifierList
                 val type = modifierList.parent as KtTypeReference
                 if (!type.hasModifier(KtTokens.SUSPEND_KEYWORD)) return@quickFixesPsiBasedFactory emptyList()
-                listOf(RemoveModifierFix(type, KtTokens.SUSPEND_KEYWORD, isRedundant = false))
+                listOf(RemoveModifierFixBase(type, KtTokens.SUSPEND_KEYWORD, isRedundant = false))
             }
         }
 
@@ -135,7 +124,7 @@ class RemoveModifierFix(
             return quickFixesPsiBasedFactory { psiElement: PsiElement ->
                 val property = psiElement as? KtProperty ?: return@quickFixesPsiBasedFactory emptyList()
                 if (!property.hasModifier(KtTokens.LATEINIT_KEYWORD)) return@quickFixesPsiBasedFactory emptyList()
-                listOf(RemoveModifierFix(property, KtTokens.LATEINIT_KEYWORD, isRedundant = false))
+                listOf(RemoveModifierFixBase(property, KtTokens.LATEINIT_KEYWORD, isRedundant = false))
             }
         }
 
@@ -146,7 +135,7 @@ class RemoveModifierFix(
                 val funInterface = (modifierList.parent as? KtClass)?.takeIf {
                     it.isInterface() && it.hasModifier(KtTokens.FUN_KEYWORD)
                 } ?: return@quickFixesPsiBasedFactory emptyList()
-                listOf(RemoveModifierFix(funInterface, KtTokens.FUN_KEYWORD, isRedundant = false))
+                listOf(RemoveModifierFixBase(funInterface, KtTokens.FUN_KEYWORD, isRedundant = false))
             }
         }
 

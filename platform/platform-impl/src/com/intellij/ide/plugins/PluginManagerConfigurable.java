@@ -845,11 +845,13 @@ public final class PluginManagerConfigurable
           String defaultCategory = IdeBundle.message("plugins.configurable.other.bundled");
           visiblePlugins.get(Boolean.TRUE)
             .stream()
-            .collect(Collectors.groupingBy(descriptor -> StringUtil.notNullize(descriptor.getCategory())))
+            .collect(Collectors.groupingBy(descriptor -> StringUtil.defaultIfEmpty(descriptor.getCategory(), defaultCategory)))
             .entrySet()
             .stream()
-            .map(entry -> new ComparablePluginsGroup(entry.getKey(), defaultCategory, entry.getValue()))
-            .sorted()
+            .map(entry -> new ComparablePluginsGroup(entry.getKey(), entry.getValue()))
+            .sorted((o1, o2) -> defaultCategory.equals(o1.title) ? 1 :
+                                defaultCategory.equals(o2.title) ? -1 :
+                                o1.compareTo(o2))
             .forEachOrdered(group -> {
               myInstalledPanel.addGroup(group);
               myPluginModel.addEnabledGroup(group);
@@ -1135,16 +1137,12 @@ public final class PluginManagerConfigurable
   private final class ComparablePluginsGroup extends PluginsGroup
     implements Comparable<ComparablePluginsGroup> {
 
-    private final @NotNull @Nls String myDefaultCategory;
     private boolean myIsEnable = false;
 
     private ComparablePluginsGroup(@NotNull @NlsSafe String category,
-                                   @NotNull @Nls String defaultCategory,
                                    @NotNull List<? extends IdeaPluginDescriptor> descriptors) {
-      super(StringUtil.defaultIfEmpty(category, defaultCategory),
-            PluginsGroupType.INSTALLED);
+      super(category, PluginsGroupType.INSTALLED);
 
-      myDefaultCategory = defaultCategory;
       this.descriptors.addAll(descriptors);
       sortByName();
 
@@ -1157,9 +1155,7 @@ public final class PluginManagerConfigurable
 
     @Override
     public int compareTo(@NotNull ComparablePluginsGroup other) {
-      return myDefaultCategory.equals(title) ? 1 :
-             myDefaultCategory.equals(other.title) ? -1 :
-             StringUtil.compare(title, other.title, true);
+      return StringUtil.compare(title, other.title, true);
     }
 
     @Override
@@ -1249,10 +1245,6 @@ public final class PluginManagerConfigurable
         else if (tags == null) {
           return List.of(Tags.Paid.name());
         }
-        else if (!tags.contains(Tags.Paid.name())) {
-          tags = new ArrayList<>(tags);
-          tags.add(Tags.Paid.name());
-        }
       }
     }
     else if (productCode != null && !plugin.isBundled() && !LicensePanel.isEA2Product(productCode)) {
@@ -1263,7 +1255,7 @@ public final class PluginManagerConfigurable
           return List.of(stamp.startsWith("eval:") ? Tags.Trial.name() : Tags.Purchased.name());
         }
       }
-      return List.of(Tags.Paid.name());
+      return plugin.isLicenseOptional() ? List.of(Tags.Freemium.name()) : List.of(Tags.Paid.name());
     }
     if (ContainerUtil.isEmpty(tags)) {
       return List.of();
@@ -1276,6 +1268,9 @@ public final class PluginManagerConfigurable
       }
       if (tags.remove(Tags.Paid.name())) {
         tags.add(0, Tags.Paid.name());
+      }
+      if (tags.remove(Tags.Freemium.name())) {
+        tags.add(0, Tags.Freemium.name());
       }
     }
 

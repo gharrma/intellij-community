@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 
 package org.jetbrains.kotlin.idea.caches.resolve;
 
@@ -56,6 +56,11 @@ public class MultiplatformAnalysisTestGenerated extends AbstractMultiplatformAna
     @TestMetadata("correctOverloadResolutionAmbiguity")
     public void testCorrectOverloadResolutionAmbiguity() throws Exception {
         runTest("testData/multiplatform/correctOverloadResolutionAmbiguity/");
+    }
+
+    @TestMetadata("defaultArguments")
+    public void testDefaultArguments() throws Exception {
+        runTest("testData/multiplatform/defaultArguments/");
     }
 
     @TestMetadata("diamondActualInBottom")
@@ -186,6 +191,11 @@ public class MultiplatformAnalysisTestGenerated extends AbstractMultiplatformAna
     @TestMetadata("kt44898")
     public void testKt44898() throws Exception {
         runTest("testData/multiplatform/kt44898/");
+    }
+
+    @TestMetadata("kt48291")
+    public void testKt48291() throws Exception {
+        runTest("testData/multiplatform/kt48291/");
     }
 
     @TestMetadata("lambdas")

@@ -397,11 +397,14 @@ open class ToolWindowManagerImpl(val project: Project) : ToolWindowManagerEx(), 
     connection.subscribe(ToolWindowManagerListener.TOPIC, dispatcher.multicaster)
     connection.subscribe(FileEditorManagerListener.FILE_EDITOR_MANAGER, object : FileEditorManagerListener {
       override fun fileClosed(source: FileEditorManager, file: VirtualFile) {
-        focusManager.doWhenFocusSettlesDown(ExpirableRunnable.forProject(project) {
-          if (!FileEditorManager.getInstance(project).hasOpenFiles()) {
-            focusToolWindowByDefault()
-          }
-        })
+        ApplicationManager.getApplication().invokeLater(
+          {
+            focusManager.doWhenFocusSettlesDown(ExpirableRunnable.forProject(project) {
+              if (!project.isDisposed && !FileEditorManager.getInstance(project).hasOpenFiles()) {
+                focusToolWindowByDefault()
+              }
+            })
+          })
       }
     })
 
@@ -1755,6 +1758,9 @@ open class ToolWindowManagerImpl(val project: Project) : ToolWindowManagerEx(), 
     val dirtyMode = entry.readOnlyWindowInfo.type == ToolWindowType.DOCKED || entry.readOnlyWindowInfo.type == ToolWindowType.SLIDING
     updateStateAndRemoveDecorator(info, entry, dirtyMode)
     info.type = type
+    if (type != ToolWindowType.FLOATING && type != ToolWindowType.WINDOWED) {
+      info.internalType = type
+    }
 
     val newInfo = info.copy()
     entry.applyWindowInfo(newInfo)
@@ -2275,7 +2281,7 @@ enum class ToolWindowProperty {
 
 private fun isInActiveToolWindow(component: Any?, activeToolWindow: ToolWindowImpl): Boolean {
   var source = if (component is JComponent) component else null
-  val activeToolWindowComponent = activeToolWindow.getComponentIfInitialized()
+  val activeToolWindowComponent = activeToolWindow.decoratorComponent
   if (activeToolWindowComponent != null) {
     while (source != null && source !== activeToolWindowComponent) {
       source = ComponentUtil.getClientProperty(source, ToolWindowManagerImpl.PARENT_COMPONENT) ?: source.parent as? JComponent

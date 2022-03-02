@@ -31,6 +31,7 @@ import org.jetbrains.kotlin.incremental.*
 import org.jetbrains.kotlin.incremental.components.ExpectActualTracker
 import org.jetbrains.kotlin.incremental.components.LookupTracker
 import org.jetbrains.kotlin.build.report.ICReporterBase
+import org.jetbrains.kotlin.incremental.components.InlineConstTracker
 import org.jetbrains.kotlin.jps.KotlinJpsBundle
 import org.jetbrains.kotlin.jps.incremental.JpsIncrementalCache
 import org.jetbrains.kotlin.jps.incremental.JpsLookupStorageManager
@@ -54,17 +55,32 @@ class KotlinBuilder : ModuleLevelBuilder(BuilderCategory.SOURCE_PROCESSOR) {
         const val SKIP_CACHE_VERSION_CHECK_PROPERTY = "kotlin.jps.skip.cache.version.check"
         const val JPS_KOTLIN_HOME_PROPERTY = "jps.kotlin.home"
 
+        private val classesToLoadByParentFromRegistry =
+            System.getProperty("kotlin.jps.classesToLoadByParent")?.split(',')?.map { it.trim() } ?: emptyList()
+        private val classPrefixesToLoadByParentFromRegistry =
+            System.getProperty("kotlin.jps.classPrefixesToLoadByParent")?.split(',')?.map { it.trim() } ?: emptyList()
+
         val classesToLoadByParent: ClassCondition
             get() = ClassCondition { className ->
-                className.startsWith("org.jetbrains.kotlin.load.kotlin.incremental.components.")
-                        || className.startsWith("org.jetbrains.kotlin.incremental.components.")
-                        || className.startsWith("org.jetbrains.kotlin.incremental.js")
-                        || className == "org.jetbrains.kotlin.config.Services"
-                        || className.startsWith("org.apache.log4j.") // For logging from compiler
-                        || className == "org.jetbrains.kotlin.progress.CompilationCanceledStatus"
-                        || className == "org.jetbrains.kotlin.progress.CompilationCanceledException"
-                        || className == "org.jetbrains.kotlin.modules.TargetId"
-                        || className == "org.jetbrains.kotlin.cli.common.ExitCode"
+                val prefixes = listOf(
+                    "org.apache.log4j.", // For logging from compiler
+                    "org.jetbrains.kotlin.incremental.components.",
+                    "org.jetbrains.kotlin.incremental.js",
+                    "org.jetbrains.kotlin.load.kotlin.incremental.components."
+                ) + classPrefixesToLoadByParentFromRegistry
+
+                val classes = listOf(
+                    "org.jetbrains.kotlin.config.Services",
+                    "org.jetbrains.kotlin.progress.CompilationCanceledStatus",
+                    "org.jetbrains.kotlin.progress.CompilationCanceledException",
+                    "org.jetbrains.kotlin.modules.TargetId",
+                    "org.jetbrains.kotlin.cli.common.ExitCode"
+                ) + classesToLoadByParentFromRegistry
+
+                prefixes.forEach { if (className.startsWith(it)) return@ClassCondition true }
+                classes.forEach { if (className == it) return@ClassCondition true }
+
+                return@ClassCondition false
             }
     }
 
@@ -214,6 +230,7 @@ class KotlinBuilder : ModuleLevelBuilder(BuilderCategory.SOURCE_PROCESSOR) {
             incrementalCaches,
             LookupTracker.DO_NOTHING,
             ExpectActualTracker.DoNothing,
+            InlineConstTracker.DoNothing,
             chunk,
             messageCollector
         )
@@ -382,12 +399,14 @@ class KotlinBuilder : ModuleLevelBuilder(BuilderCategory.SOURCE_PROCESSOR) {
         val lookupTracker = getLookupTracker(project, representativeTarget)
         val exceptActualTracer = ExpectActualTrackerImpl()
         val incrementalCaches = kotlinChunk.loadCaches()
+        val inlineConstTracker = InlineConstTrackerImpl()
         val environment = createCompileEnvironment(
             context,
             representativeTarget,
             incrementalCaches,
             lookupTracker,
             exceptActualTracer,
+            inlineConstTracker,
             chunk,
             messageCollector
         )
@@ -458,7 +477,8 @@ class KotlinBuilder : ModuleLevelBuilder(BuilderCategory.SOURCE_PROCESSOR) {
             chunk,
             kotlinDirtyFilesHolder,
             generatedFiles,
-            incrementalCaches
+            incrementalCaches,
+            environment
         )
 
         if (!representativeTarget.isIncrementalCompilationEnabled) {
@@ -560,20 +580,9 @@ class KotlinBuilder : ModuleLevelBuilder(BuilderCategory.SOURCE_PROCESSOR) {
 
                 val targetDirtyFiles = dirtyFilesHolder.byTarget[jpsTarget]
                 if (cache != null && targetDirtyFiles != null) {
-                    val dirtyFiles = targetDirtyFiles.dirty.keys + targetDirtyFiles.removed
-                    val complementaryFiles = cache.getComplementaryFilesRecursive(dirtyFiles)
+                    val complementaryFiles = cache.getComplementaryFilesRecursive(targetDirtyFiles.dirty.keys + targetDirtyFiles.removed)
 
-                    // Get all parts of @JvmMultifileClass file for simultaneous rebuild
-                    var dirtyMultifileClassFiles: Collection<File> = emptyList()
-                    if (cache is IncrementalJvmCache) {
-                        dirtyMultifileClassFiles = cache.classesBySources(dirtyFiles)
-                            .filter { cache.isMultifileFacade(it) }
-                            .flatMap { cache.getAllPartsOfMultifileFacade(it).orEmpty() }
-                            .flatMap { cache.sourcesByInternalName(it) }
-                            .distinct()
-                            .filter { !dirtyFiles.contains(it) }
-                    }
-                    fsOperations.markFilesForCurrentRound(jpsTarget, complementaryFiles + dirtyMultifileClassFiles)
+                    fsOperations.markFilesForCurrentRound(jpsTarget, complementaryFiles)
 
                     cache.markDirty(targetDirtyFiles.dirty.keys + targetDirtyFiles.removed)
                 }
@@ -615,11 +624,12 @@ class KotlinBuilder : ModuleLevelBuilder(BuilderCategory.SOURCE_PROCESSOR) {
         incrementalCaches: Map<KotlinModuleBuildTarget<*>, JpsIncrementalCache>,
         lookupTracker: LookupTracker,
         exceptActualTracer: ExpectActualTracker,
+        inlineConstTracker: InlineConstTracker,
         chunk: ModuleChunk,
         messageCollector: MessageCollectorAdapter
     ): JpsCompilerEnvironment {
         val compilerServices = with(Services.Builder()) {
-            kotlinModuleBuilderTarget.makeServices(this, incrementalCaches, lookupTracker, exceptActualTracer)
+            kotlinModuleBuilderTarget.makeServices(this, incrementalCaches, lookupTracker, exceptActualTracer, inlineConstTracker)
             build()
         }
 

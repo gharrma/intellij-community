@@ -14,11 +14,13 @@ import org.jetbrains.kotlin.idea.core.copied
 import org.jetbrains.kotlin.idea.core.replaced
 import org.jetbrains.kotlin.lexer.KtSingleValueToken
 import org.jetbrains.kotlin.load.java.JvmAbi
+import org.jetbrains.kotlin.load.java.propertyNameBySetMethodName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.*
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.bindingContextUtil.getReferenceTargets
+import org.jetbrains.kotlin.resolve.references.ReferenceAccess
 import org.jetbrains.kotlin.synthetic.SyntheticJavaPropertyDescriptor
 import org.jetbrains.kotlin.types.expressions.OperatorConventions
 import org.jetbrains.kotlin.utils.addIfNotNull
@@ -94,7 +96,7 @@ class SyntheticPropertyAccessorReferenceDescriptorImpl(
         } else {
             //TODO: it's not correct
             //TODO: setIsY -> setIsIsY bug
-            SyntheticJavaPropertyDescriptor.propertyNameBySetMethodName(
+            propertyNameBySetMethodName(
                 newNameAsName,
                 withIsPrefix = expression.getReferencedNameAsName().asString().startsWith(
                     "is"

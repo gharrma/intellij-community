@@ -8,6 +8,7 @@ import com.intellij.openapi.fileTypes.FileType
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginAdvertiserEditorNotificationProvider
 import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.PluginAdvertiserExtensionsStateService
+import com.intellij.openapi.updateSettings.impl.pluginsAdvertisement.isIgnoreIdeSuggestion
 import com.intellij.testFramework.PlatformTestUtil
 import com.intellij.testFramework.ProjectRule
 import org.junit.BeforeClass
@@ -65,6 +66,19 @@ class PluginsAdvertiserTest {
   }
 
   @Test
+  fun suggestedIdeDismissed() {
+    preparePluginCache("*.js" to PluginData("JavaScript", isBundled = true))
+    isIgnoreIdeSuggestion = true
+    try {
+      val suggestion = PluginAdvertiserEditorNotificationProvider.getSuggestionData(projectRule.project, "IC", "foo.js", PlainTextFileType.INSTANCE)
+      assertEquals(0, suggestion!!.suggestedIdes.size)
+    }
+    finally {
+      isIgnoreIdeSuggestion = false
+    }
+  }
+
+  @Test
   fun suggestedIdeInPyCharmCommunity() {
     preparePluginCache("*.js" to PluginData("JavaScript"))
     val suggestion = PluginAdvertiserEditorNotificationProvider.getSuggestionData(projectRule.project, "PC", "foo.js", PlainTextFileType.INSTANCE)
@@ -81,8 +95,11 @@ class PluginsAdvertiserTest {
   @Test
   fun suggestionForNonPlainTextFile() {
     preparePluginCache("build.xml" to PluginData("Ant"))
-    val suggestion = PluginAdvertiserEditorNotificationProvider.getSuggestionData(projectRule.project, "IU", "build.xml", SupportedFileType())
-    assertEquals(listOf("Ant"), suggestion!!.myThirdParty.map { it.pluginIdString })
+    val suggestion = PluginAdvertiserEditorNotificationProvider.getSuggestionData(projectRule.project, "IU", "build.xml",
+                                                                                  SupportedFileType())
+
+    assertNotNull(suggestion)
+    assertEquals(listOf("Ant"), suggestion.thirdParty.map { it.idString })
   }
 
   @Test
@@ -102,8 +119,11 @@ class PluginsAdvertiserTest {
   @Test
   fun suggestPluginByExtension() {
     preparePluginCache("*.lua" to PluginData("Lua"))
-    val suggestion = PluginAdvertiserEditorNotificationProvider.getSuggestionData(projectRule.project, "IU", "foo.lua", PlainTextFileType.INSTANCE)
-    assertEquals(listOf("Lua"), suggestion!!.myThirdParty.map { it.pluginIdString })
+    val suggestion = PluginAdvertiserEditorNotificationProvider.getSuggestionData(projectRule.project, "IU", "foo.lua",
+                                                                                  PlainTextFileType.INSTANCE)
+
+    assertNotNull(suggestion)
+    assertEquals(listOf("Lua"), suggestion.thirdParty.map { it.idString })
   }
 
   private fun preparePluginCache(vararg ext: Pair<String, PluginData?>) {

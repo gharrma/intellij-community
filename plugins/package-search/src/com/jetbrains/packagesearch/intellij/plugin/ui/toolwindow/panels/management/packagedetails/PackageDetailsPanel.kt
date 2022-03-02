@@ -1,5 +1,7 @@
 package com.jetbrains.packagesearch.intellij.plugin.ui.toolwindow.panels.management.packagedetails
 
+import com.intellij.openapi.application.EDT
+import com.intellij.openapi.project.Project
 import com.intellij.ui.components.JBScrollPane
 import com.intellij.util.ui.UIUtil
 import com.jetbrains.packagesearch.intellij.plugin.PackageSearchBundle
@@ -11,7 +13,6 @@ import com.jetbrains.packagesearch.intellij.plugin.ui.toolwindow.models.UiPackag
 import com.jetbrains.packagesearch.intellij.plugin.ui.toolwindow.panels.PackageSearchPanelBase
 import com.jetbrains.packagesearch.intellij.plugin.ui.util.emptyBorder
 import com.jetbrains.packagesearch.intellij.plugin.ui.util.scaledEmptyBorder
-import com.jetbrains.packagesearch.intellij.plugin.util.AppUI
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -22,6 +23,7 @@ import javax.swing.JViewport
 import javax.swing.SwingConstants
 
 internal class PackageDetailsPanel(
+    project: Project,
     operationExecutor: OperationExecutor
 ) : PackageSearchPanelBase(PackageSearchBundle.message("packagesearch.ui.toolwindow.tab.packages.selectedPackage")) {
 
@@ -31,7 +33,7 @@ internal class PackageDetailsPanel(
         border = emptyBorder()
     }
 
-    private val headerPanel = PackageDetailsHeaderPanel(operationExecutor)
+    private val headerPanel = PackageDetailsHeaderPanel(project, operationExecutor)
 
     private val infoPanel = PackageDetailsInfoPanel()
 
@@ -96,7 +98,7 @@ internal class PackageDetailsPanel(
 
         showPanel(CONTENT_PANEL)
 
-        viewModel.invokeLaterScope.launch(Dispatchers.AppUI) { scrollPanel.viewport.viewPosition = Point(0, 0) }
+        viewModel.invokeLaterScope.launch(Dispatchers.EDT) { scrollPanel.viewport.viewPosition = Point(0, 0) }
     }
 
     private fun showPanel(panelName: String) {

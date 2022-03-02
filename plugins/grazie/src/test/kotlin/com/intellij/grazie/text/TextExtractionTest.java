@@ -18,6 +18,7 @@ import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.psi.xml.XmlTag;
 import com.intellij.testFramework.PlatformTestUtil;
 import com.intellij.testFramework.fixtures.BasePlatformTestCase;
+import one.util.streamex.IntStreamEx;
 import org.intellij.lang.regexp.RegExpLanguage;
 import org.intellij.plugins.markdown.lang.MarkdownFileType;
 import org.intellij.plugins.markdown.lang.MarkdownLanguage;
@@ -36,6 +37,11 @@ public class TextExtractionTest extends BasePlatformTestCase {
     int prefix = "* ".length();
     assertEquals(prefix + "list [".length(), extracted.textOffsetToFile("list ".length()));
     assertEquals(prefix + "list [item".length(), extracted.textOffsetToFile("list item".length()));
+  }
+
+  public void testMarkdownUrlLink() {
+    TextContent extracted = extractText("a.md", "go to [http://localhost](http://localhost) and validate", 3);
+    assertEquals("go to http://localhost and validate", unknownOffsets(extracted));
   }
 
   public void testMarkdownImage() {
@@ -89,6 +95,10 @@ public class TextExtractionTest extends BasePlatformTestCase {
 
   public void testMultiLineCommentInProperties() {
     assertEquals("line1\nline2", unknownOffsets(extractText("a.properties", "# line1\n! line2", 4)));
+  }
+
+  public void test_multiline_value_in_properties_does_not_include_leading_space() {
+    assertEquals("line1line2", unknownOffsets(extractText("a.properties", "a=line1\\\n \t line2", 4)));
   }
 
   public void testJavadoc() {
@@ -166,6 +176,28 @@ public class TextExtractionTest extends BasePlatformTestCase {
 
     Registry.get("grazie.html.concatenate.inline.tag.contents").setValue(true, getTestRootDisposable());
     checkHtmlXml(true);
+  }
+
+  public void testLargeXmlPerformance() {
+    String text = "<!DOCTYPE rules [\n" +
+                  IntStreamEx.range(0, 1000).mapToObj(i -> "<!ENTITY pnct" + i + " \"x\">\n").joining() +
+                  "]>\n" +
+                  "<rules> content </rules><caret>";
+    int offset1 = text.indexOf("content");
+    int offset2 = text.indexOf("\n<!ENTITY");
+    PsiFile file = myFixture.configureByText("a.xml", text);
+
+    PlatformTestUtil
+      .startPerformanceTest("text extraction", 1_000, () -> {
+        assertEquals("content", TextExtractor.findTextAt(file, offset1, TextContent.TextDomain.ALL).toString());
+        assertNull(TextExtractor.findTextAt(file, offset2, TextContent.TextDomain.ALL));
+      })
+      .setup(() -> {
+        myFixture.type(' ');
+        PsiDocumentManager.getInstance(getProject()).commitAllDocuments(); // drop file caches
+      })
+      .usesAllCPUCores()
+      .assertTiming();
   }
 
   private void checkHtmlXml(boolean inlineTagsSupported) {

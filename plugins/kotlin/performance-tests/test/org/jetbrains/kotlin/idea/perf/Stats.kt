@@ -92,35 +92,34 @@ class Stats(
 
     fun <SV, TV> perfTest(
         testName: String,
-        warmUpIterations: Int = 5,
-        iterations: Int = 20,
-        fastIterations: Boolean = false,
-        setUp: (TestData<SV, TV>) -> Unit = { },
-        test: (TestData<SV, TV>) -> Unit,
-        tearDown: (TestData<SV, TV>) -> Unit = { },
-        checkStability: Boolean = true,
-        stopAtException: Boolean = false,
-    ) {
-        val warmPhaseData = PhaseData(
-            iterations = warmUpIterations,
-            testName = testName,
-            fastIterations = fastIterations,
-            setUp = setUp,
-            test = test,
-            tearDown = tearDown
-        )
+        perfTest: PerfTest<SV, TV>
+    ) = with(perfTest) {
         val mainPhaseData = PhaseData(
             iterations = iterations,
             testName = testName,
             fastIterations = fastIterations,
             setUp = setUp,
             test = test,
-            tearDown = tearDown
+            tearDown = tearDown,
+            afterTestCheck = afterTestCheck,
+            reportCompilerCounters = perfTest.reportCompilerCounters,
         )
         val block = {
             val metricChildren = mutableListOf<Metric>()
             try {
-                warmUpPhase(warmPhaseData, metricChildren, stopAtException)
+                if (warmUpIterations > 0) {
+                    val warmPhaseData = PhaseData(
+                        iterations = warmUpIterations,
+                        testName = testName,
+                        fastIterations = fastIterations,
+                        setUp = setUp,
+                        test = test,
+                        tearDown = tearDown,
+                        afterTestCheck = afterTestCheck,
+                        reportCompilerCounters = perfTest.reportCompilerCounters,
+                    )
+                    warmUpPhase(warmPhaseData, metricChildren, stopAtException)
+                }
                 val statInfoArray = mainPhase(mainPhaseData, metricChildren, stopAtException)
 
                 if (!mainPhaseData.fastIterations) assertEquals(iterations, statInfoArray.size)
@@ -305,9 +304,19 @@ class Stats(
                         phaseData.test(testData)
                     }
 
-                    PerformanceCounter.report { name, counter, nanos ->
-                        valueMap["counter \"$name\": count"] = counter.toLong()
-                        valueMap["counter \"$name\": time"] = nanos.nsToMs
+                    if (phaseData.reportCompilerCounters) {
+                        PerformanceCounter.report { name, counter, nanos ->
+                            valueMap["counter \"$name\": count"] = counter.toLong()
+                            valueMap["counter \"$name\": time"] = nanos.nsToMs
+                        }
+                    }
+
+                    when (val result = phaseData.afterTestCheck(testData)) {
+                        is TestCheckResult.Failure -> {
+                            val messages = result.messages.joinToString(separator = "\n")
+                            error(messages)
+                        }
+                        TestCheckResult.Success -> {}
                     }
 
                 } catch (t: Throwable) {
@@ -494,7 +503,9 @@ data class PhaseData<SV, TV>(
     val setUp: (TestData<SV, TV>) -> Unit,
     val test: (TestData<SV, TV>) -> Unit,
     val tearDown: (TestData<SV, TV>) -> Unit,
-    val fastIterations: Boolean = false
+    val fastIterations: Boolean = false,
+    val reportCompilerCounters: Boolean,
+    val afterTestCheck: (TestData<SV, TV>) -> TestCheckResult,
 )
 
 data class TestData<SV, TV>(var setUpValue: SV?, var value: TV?) {

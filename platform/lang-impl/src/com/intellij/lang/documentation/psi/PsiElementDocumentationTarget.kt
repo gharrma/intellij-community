@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.lang.documentation.psi
 
 import com.intellij.codeInsight.documentation.DocumentationManager
@@ -14,22 +14,24 @@ import com.intellij.psi.PsiFile
 import com.intellij.refactoring.suggested.createSmartPointer
 import com.intellij.util.SlowOperations
 import com.intellij.util.concurrency.annotations.RequiresReadLock
+import org.jetbrains.annotations.VisibleForTesting
 import java.util.function.Supplier
 
-internal class PsiElementDocumentationTarget private constructor(
+@VisibleForTesting
+class PsiElementDocumentationTarget private constructor(
   val targetElement: PsiElement,
   private val sourceElement: PsiElement?,
   private val pointer: PsiElementDocumentationTargetPointer,
 ) : DocumentationTarget {
 
-  constructor(
+  internal constructor(
     project: Project,
     targetElement: PsiElement,
   ) : this(
     project, targetElement, sourceElement = null, anchor = null
   )
 
-  constructor(
+  internal constructor(
     project: Project,
     targetElement: PsiElement,
     sourceElement: PsiElement?,
@@ -61,21 +63,22 @@ internal class PsiElementDocumentationTarget private constructor(
     if (urls == null || urls.isEmpty()) {
       return localDoc
     }
-    return pointer.fetchExternal(targetElement, provider, urls, localDoc)
+    return pointer.fetchExternal(targetElement, provider, urls, localDoc?.copy(linkUrls = urls))
   }
 
+  @Suppress("TestOnlyProblems")
   @RequiresReadLock
-  private fun localDoc(provider: DocumentationProvider): DocumentationResult? {
+  private fun localDoc(provider: DocumentationProvider): DocumentationData? {
     val originalPsi = targetElement.getUserData(DocumentationManager.ORIGINAL_ELEMENT_KEY)?.element
     val doc = provider.generateDoc(targetElement, originalPsi)
     if (targetElement is PsiFile) {
       val fileDoc = DocumentationManager.generateFileDoc(targetElement, doc == null)
       if (fileDoc != null) {
-        return DocumentationResult.documentation(if (doc == null) fileDoc else doc + fileDoc, pointer.anchor, pointer.imageResolver)
+        return DocumentationData(if (doc == null) fileDoc else doc + fileDoc, pointer.anchor, null, emptyList(), pointer.imageResolver)
       }
     }
     if (doc != null) {
-      return DocumentationResult.documentation(doc, pointer.anchor, pointer.imageResolver)
+      return DocumentationData(doc, pointer.anchor, null, emptyList(), pointer.imageResolver)
     }
     return null
   }
