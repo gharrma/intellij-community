@@ -5,6 +5,7 @@ package org.jetbrains.kotlin.idea.configuration
 import com.intellij.ide.IdeBundle
 import com.intellij.openapi.options.Configurable
 import com.intellij.openapi.options.SearchableConfigurable
+import com.intellij.openapi.ui.MessageDialogBuilder
 import com.intellij.openapi.updateSettings.impl.UpdateSettings
 import com.intellij.openapi.util.NlsSafe
 import org.jetbrains.annotations.Nls
@@ -126,10 +127,26 @@ class KotlinLanguageConfiguration : SearchableConfigurable, Configurable.NoScrol
         form.channelCombo.selectedIndex = savedChannel
 
         form.channelCombo.addActionListener {
-            val newChannel = form.channelCombo.selectedIndex
-            if (newChannel != savedChannel) {
-                savedChannel = newChannel
-                checkForUpdates()
+            val selectedIndex = form.channelCombo.selectedIndex
+            if (selectedIndex != savedChannel) {
+                if (selectedIndex == UpdateChannel.EAP.ordinal) {
+                    // Android Studio: if switching to the EAP channel, we require explicit confirmation from
+                    // the user that they want to download Kotlin builds from JetBrains. This is putatively
+                    // temporary until we have a broader solution for third-party plugins in general.
+                    val legalese = "EAP Kotlin builds are provided by JetBrains and receive no support from Google. " +
+                            "EAP builds are experimental and can potentially break Android Studio, requiring reinstallation. " +
+                            "Would you like to continue?"
+                    val confirmation = MessageDialogBuilder.okCancel("Switching to EAP Builds From JetBrains", legalese)
+                    if (confirmation.ask(parentComponent = form.mainPanel)) {
+                        savedChannel = selectedIndex
+                        checkForUpdates()
+                    } else {
+                        form.channelCombo.selectedIndex = savedChannel
+                    }
+                } else {
+                    savedChannel = selectedIndex
+                    checkForUpdates()
+                }
             }
         }
 
