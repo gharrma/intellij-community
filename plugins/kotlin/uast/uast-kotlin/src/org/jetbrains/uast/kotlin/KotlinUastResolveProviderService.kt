@@ -14,7 +14,6 @@ import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorUtils
-import org.jetbrains.kotlin.resolve.bindingContextUtil.isUsedAsResultOfLambda
 import org.jetbrains.kotlin.resolve.calls.components.isVararg
 import org.jetbrains.kotlin.resolve.calls.model.ArgumentMatch
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
@@ -117,11 +116,13 @@ interface KotlinUastResolveProviderService : BaseKotlinUastResolveProviderServic
 
     override fun getImplicitReturn(ktLambdaExpression: KtLambdaExpression, parent: UElement): KotlinUImplicitReturnExpression? {
         val lastExpression = ktLambdaExpression.bodyExpression?.statements?.lastOrNull() ?: return null
-        if (!lastExpression.isUsedAsResultOfLambda(lastExpression.analyze())) return null
-
-        return KotlinUImplicitReturnExpression(parent).apply {
-            returnExpression = baseKotlinConverter.convertOrEmpty(lastExpression, this)
+        val context = lastExpression.analyze()
+        if (context[BindingContext.USED_AS_RESULT_OF_LAMBDA, lastExpression] == true) {
+            return KotlinUImplicitReturnExpression(parent).apply {
+                returnExpression = baseKotlinConverter.convertOrEmpty(lastExpression, this)
+            }
         }
+        return null
     }
 
     override fun getImplicitParameters(

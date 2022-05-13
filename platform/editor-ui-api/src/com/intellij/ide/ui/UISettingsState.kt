@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.ui
 
 import com.intellij.openapi.components.BaseState
@@ -9,7 +9,6 @@ import com.intellij.util.PlatformUtils
 import com.intellij.util.xmlb.annotations.OptionTag
 import com.intellij.util.xmlb.annotations.Transient
 import javax.swing.SwingConstants
-import kotlin.math.roundToInt
 
 class UISettingsState : BaseState() {
   companion object {
@@ -19,8 +18,8 @@ class UISettingsState : BaseState() {
      * @return the default scaled font size
      */
     @JvmStatic
-    val defFontSize: Int
-      get() = (JBUIScale.DEF_SYSTEM_FONT_SIZE * UISettings.defFontScale).roundToInt()
+    val defFontSize: Float
+      get() = JBUIScale.DEF_SYSTEM_FONT_SIZE * UISettings.defFontScale
   }
 
   @get:OptionTag("FONT_FACE")
@@ -111,6 +110,8 @@ class UISettingsState : BaseState() {
 
   @get:OptionTag("SORT_TABS_ALPHABETICALLY")
   var sortTabsAlphabetically by property(false)
+  @get:OptionTag("KEEP_TABS_ALPHABETICALLY_SORTED")
+  var alwaysKeepTabsAlphabeticallySorted by property(false)
   @get:OptionTag("OPEN_TABS_AT_THE_END")
   var openTabsAtTheEnd by property(false)
 
@@ -160,6 +161,8 @@ class UISettingsState : BaseState() {
   var maxLookupListHeight by property(11)
   @get:OptionTag("DND_WITH_PRESSED_ALT_ONLY")
   var dndWithPressedAltOnly by property(false)
+  @get:OptionTag("SEPARATE_MAIN_MENU")
+  var separateMainMenu by property(false)
   @get:OptionTag("DEFAULT_AUTOSCROLL_TO_SOURCE")
   var defaultAutoScrollToSource by property(false)
   @get:Transient
@@ -206,6 +209,9 @@ class UISettingsState : BaseState() {
   var pinFindInPath by property(false)
   @get:OptionTag("SHOW_INPLACE_COMMENTS")
   var showInplaceComments by property(false)
+
+  @get:OptionTag("SHOW_VISUAL_FORMATTING_LAYER")
+  var showVisualFormattingLayer by property(false)
 
   @Suppress("FunctionName")
   fun _incrementModificationCount() = incrementModificationCount()

@@ -14,9 +14,9 @@ import com.intellij.structuralsearch.impl.matcher.MatchContext
 import com.intellij.structuralsearch.impl.matcher.predicates.MatchPredicate
 import com.intellij.structuralsearch.impl.matcher.predicates.RegExpPredicate
 import org.jetbrains.kotlin.builtins.getReceiverTypeFromFunctionType
+import org.jetbrains.kotlin.idea.base.utils.fqname.getKotlinFqName
 import org.jetbrains.kotlin.idea.core.resolveType
 import org.jetbrains.kotlin.idea.refactoring.fqName.fqName
-import org.jetbrains.kotlin.idea.refactoring.fqName.getKotlinFqName
 import org.jetbrains.kotlin.idea.search.allScope
 import org.jetbrains.kotlin.idea.structuralsearch.resolveKotlinType
 import org.jetbrains.kotlin.idea.stubindex.KotlinClassShortNameIndex
@@ -40,7 +40,6 @@ class KotlinExprTypePredicate(
     private val baseName: String,
     private val regex: Boolean
 ) : MatchPredicate() {
-
     override fun match(matchedNode: PsiElement, start: Int, end: Int, context: MatchContext): Boolean {
         val searchedTypeNames = if (regex) listOf() else search.split('|')
         if (matchedNode is KtExpression && matchedNode.isNull() && searchedTypeNames.contains("null")) return true
@@ -181,7 +180,7 @@ class KotlinExprTypePredicate(
 
             // Java indexes
             when {
-                fq -> if (JavaFullClassNameIndex.getInstance()[className.hashCode(), project, scope].any {
+                fq -> if (JavaFullClassNameIndex.getInstance()[className, project, scope].any {
                         it.getKotlinFqName() == type.fqName
                     }) return true
                 else -> if (JavaShortClassNameIndex.getInstance()[className, project, scope].any {

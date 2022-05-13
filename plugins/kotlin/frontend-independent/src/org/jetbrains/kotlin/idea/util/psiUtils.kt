@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.util
 
@@ -10,20 +10,21 @@ import com.intellij.psi.util.parentsOfType
 import org.jetbrains.kotlin.asJava.classes.KtLightClass
 import org.jetbrains.kotlin.cfg.containingDeclarationForPseudocode
 import org.jetbrains.kotlin.descriptors.annotations.AnnotationUseSiteTarget
-import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.diagnostics.WhenMissingCase
+import org.jetbrains.kotlin.fileClasses.JvmFileClassUtil
 import org.jetbrains.kotlin.idea.references.mainReference
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.load.java.JvmAnnotationNames
 import org.jetbrains.kotlin.load.kotlin.header.KotlinClassHeader
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.name.JvmNames
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.isAncestor
 import org.jetbrains.kotlin.psi.psiUtil.visibilityModifierTypeOrDefault
-import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 import org.jetbrains.kotlin.renderer.render
+import org.jetbrains.kotlin.resolve.jvm.JvmClassName
 
 fun KtElement.getElementTextInContext(): String {
     val context = parentOfType<KtImportDirective>()
@@ -117,19 +118,28 @@ fun KtAnnotated.hasAnnotationWithShortName(
     useSiteTarget: AnnotationUseSiteTarget? = null,
 ): Boolean = hasAnnotationWithShortName(shortName.asString(), useSiteTarget)
 
+val KtFile.jvmPackage: String?
+    get() = JvmFileClassUtil.findAnnotationEntryOnFileNoResolve(this, JvmNames.JVM_PACKAGE_NAME_SHORT)
+        ?.let(JvmFileClassUtil::getLiteralStringFromAnnotation)
+
+val KtFile.jvmPackageFqName: FqName get() = jvmPackage?.let(::FqName) ?: packageFqName
+val KtFile.psiPackage: PsiPackage? get() = JavaPsiFacade.getInstance(project).findPackage(jvmPackageFqName.asString())
+
 val KtNamedFunction.jvmName: String? get() = findJvmName()
 val KtPropertyAccessor.jvmName: String? get() = findJvmName()
-val KtValVarKeywordOwner.jvmSetterName: String? get() = when (this) {
-    is KtProperty -> setter?.jvmName ?: findJvmName(AnnotationUseSiteTarget.PROPERTY_SETTER)
-    is KtParameter -> findJvmName(AnnotationUseSiteTarget.PROPERTY_SETTER)
-    else -> null
-}
+val KtValVarKeywordOwner.jvmSetterName: String?
+    get() = when (this) {
+        is KtProperty -> setter?.jvmName ?: findJvmName(AnnotationUseSiteTarget.PROPERTY_SETTER)
+        is KtParameter -> findJvmName(AnnotationUseSiteTarget.PROPERTY_SETTER)
+        else -> null
+    }
 
-val KtValVarKeywordOwner.jvmGetterName: String? get() = when (this) {
-    is KtProperty -> getter?.jvmName ?: findJvmName(AnnotationUseSiteTarget.PROPERTY_GETTER)
-    is KtParameter -> findJvmName(AnnotationUseSiteTarget.PROPERTY_GETTER)
-    else -> null
-}
+val KtValVarKeywordOwner.jvmGetterName: String?
+    get() = when (this) {
+        is KtProperty -> getter?.jvmName ?: findJvmName(AnnotationUseSiteTarget.PROPERTY_GETTER)
+        is KtParameter -> findJvmName(AnnotationUseSiteTarget.PROPERTY_GETTER)
+        else -> null
+    }
 
 fun KtCallableDeclaration.numberOfArguments(countReceiver: Boolean = false): Int =
     valueParameters.size + (1.takeIf { countReceiver && receiverTypeReference != null } ?: 0)

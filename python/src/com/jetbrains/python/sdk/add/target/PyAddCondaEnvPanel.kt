@@ -62,8 +62,7 @@ open class PyAddCondaEnvPanel(
     path?.let {
       text = it
     }
-    // TODO [targets] Requires target-based browser
-    addBrowseFolderListener(PyBundle.message("python.sdk.select.conda.path.title"), null, project,
+    addBrowseFolderListener(PyBundle.message("python.sdk.select.conda.path.title"), project, targetEnvironmentConfiguration,
                             FileChooserDescriptorFactory.createSingleFileOrExecutableAppDescriptor())
     textField.document.addDocumentListener(object : DocumentAdapter() {
       override fun textChanged(e: DocumentEvent) {
@@ -73,7 +72,7 @@ open class PyAddCondaEnvPanel(
   }
 
   protected val pathField = TextFieldWithBrowseButton().apply {
-    addBrowseFolderListener(PyBundle.message("python.sdk.select.location.for.conda.title"), null, project,
+    addBrowseFolderListener(PyBundle.message("python.sdk.select.location.for.conda.title"), project, targetEnvironmentConfiguration,
                             FileChooserDescriptorFactory.createSingleFolderDescriptor())
   }
   private val makeSharedField = JBCheckBox(PyBundle.message("available.to.all.projects"))
@@ -140,6 +139,7 @@ open class PyAddCondaEnvPanel(
 
       updateComponentsVisibility()
     }
+
     add(formPanel, BorderLayout.NORTH)
   }
 
@@ -149,7 +149,7 @@ open class PyAddCondaEnvPanel(
     else
       listOfNotNull(validateSdkComboBox(interpreterCombobox, this), CondaEnvSdkFlavor.validateCondaPath(condaPathField.text))
 
-  override fun getOrCreateSdk(): Sdk? = super.getOrCreateSdk(targetEnvironmentConfiguration = null)
+  override fun getOrCreateSdk(): Sdk? = getOrCreateSdk(targetEnvironmentConfiguration = null)
 
   override fun getOrCreateSdk(targetEnvironmentConfiguration: TargetEnvironmentConfiguration?): Sdk? =
     when (val item = interpreterCombobox.selectedItem) {
@@ -226,7 +226,8 @@ open class PyAddCondaEnvPanel(
     val userHome = if (targetEnvironmentConfiguration == null) SystemProperties.getUserHome() else config.userHome
     val baseDir = defaultBaseDir ?: "$userHome/.conda/envs"
     val dirName = PathUtil.getFileName(projectBasePath ?: "untitled")
-    pathField.text = FileUtil.toSystemDependentName("$baseDir/$dirName")
+    val fullPath = "$baseDir/$dirName"
+    pathField.text = if (targetEnvironmentConfiguration.isLocal()) FileUtil.toSystemDependentName(fullPath) else fullPath
   }
 
   private val defaultBaseDir: String?

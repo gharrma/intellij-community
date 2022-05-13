@@ -10,7 +10,7 @@ import org.jetbrains.plugins.gradle.tooling.annotation.PluginTargetVersions
 import org.jetbrains.plugins.gradle.util.GradleConstants
 import org.junit.Test
 
-class GradleNativeLibrariesPropagationTest : TestCaseWithFakeKotlinNative() {
+class GradleNativeLibrariesPropagationTest16 : TestCaseWithFakeKotlinNative() {
     override fun getExternalSystemConfigFileName() = GradleConstants.KOTLIN_DSL_SCRIPT_NAME
 
     override fun testDataDirName() = "nativeLibraries"

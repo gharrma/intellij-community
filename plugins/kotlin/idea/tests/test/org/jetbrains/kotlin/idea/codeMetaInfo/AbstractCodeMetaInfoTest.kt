@@ -23,6 +23,7 @@ import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.UsageSearchContext
 import com.intellij.testFramework.fixtures.impl.CodeInsightTestFixtureImpl
 import com.intellij.testFramework.runInEdtAndWait
+import com.intellij.util.LineSeparator
 import com.intellij.util.io.exists
 import org.jetbrains.kotlin.checkers.diagnostics.DebugInfoDiagnostic
 import org.jetbrains.kotlin.checkers.diagnostics.SyntaxErrorDiagnostic
@@ -173,7 +174,9 @@ class CodeMetaInfoTestCase(
         }
 
         val parsedMetaInfo = if (expectedFile.exists()) {
-            CodeMetaInfoParser.getCodeMetaInfoFromText(expectedFile.readText()).toMutableList()
+            // Fix for Windows
+            val expectedText = expectedFile.readText().replace(LineSeparator.CRLF.separatorString, LineSeparator.LF.separatorString)
+            CodeMetaInfoParser.getCodeMetaInfoFromText(expectedText).toMutableList()
         } else {
             mutableListOf()
         }

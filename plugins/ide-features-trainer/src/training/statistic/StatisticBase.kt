@@ -1,8 +1,8 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package training.statistic
 
 import com.intellij.ide.TipsOfTheDayUsagesCollector.TipInfoValidationRule
-import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.ide.plugins.PluginManager
 import com.intellij.internal.statistic.eventLog.EventLogGroup
 import com.intellij.internal.statistic.eventLog.FeatureUsageData
 import com.intellij.internal.statistic.eventLog.events.*
@@ -29,6 +29,7 @@ import training.statistic.FeatureUsageStatisticConsts.FEEDBACK_HAS_BEEN_SENT
 import training.statistic.FeatureUsageStatisticConsts.FEEDBACK_LIKENESS_ANSWER
 import training.statistic.FeatureUsageStatisticConsts.FEEDBACK_OPENED_VIA_NOTIFICATION
 import training.statistic.FeatureUsageStatisticConsts.HELP_LINK_CLICKED
+import training.statistic.FeatureUsageStatisticConsts.INTERNAL_PROBLEM
 import training.statistic.FeatureUsageStatisticConsts.KEYMAP_SCHEME
 import training.statistic.FeatureUsageStatisticConsts.LANGUAGE
 import training.statistic.FeatureUsageStatisticConsts.LAST_BUILD_LEARNING_OPENED
@@ -45,6 +46,7 @@ import training.statistic.FeatureUsageStatisticConsts.NON_LEARNING_PROJECT_OPENE
 import training.statistic.FeatureUsageStatisticConsts.ONBOARDING_FEEDBACK_DIALOG_RESULT
 import training.statistic.FeatureUsageStatisticConsts.ONBOARDING_FEEDBACK_NOTIFICATION_SHOWN
 import training.statistic.FeatureUsageStatisticConsts.PASSED
+import training.statistic.FeatureUsageStatisticConsts.PROBLEM
 import training.statistic.FeatureUsageStatisticConsts.PROGRESS
 import training.statistic.FeatureUsageStatisticConsts.REASON
 import training.statistic.FeatureUsageStatisticConsts.RESTORE
@@ -62,7 +64,7 @@ import java.util.concurrent.ConcurrentHashMap
 import javax.swing.JOptionPane
 
 enum class LessonStartingWay {
-  NEXT_BUTTON, PREV_BUTTON, RESTART_BUTTON, RESTORE_LINK, ONBOARDING_PROMOTER, LEARN_TAB, TIP_AND_TRICK_PROMOTER
+  NEXT_BUTTON, PREV_BUTTON, RESTART_BUTTON, RESTORE_LINK, ONBOARDING_PROMOTER, LEARN_TAB, TIP_AND_TRICK_PROMOTER, NO_SDK_RESTART
 }
 
 internal enum class FeedbackEntryPlace {
@@ -71,6 +73,10 @@ internal enum class FeedbackEntryPlace {
 
 internal enum class FeedbackLikenessAnswer {
   NO_ANSWER, LIKE, DISLIKE
+}
+
+enum class LearningInternalProblems {
+  NO_SDK_CONFIGURED, // Before learning start we are trying to autoconfigure SDK or at least ask about location
 }
 
 internal class StatisticBase : CounterUsagesCollector() {
@@ -90,7 +96,7 @@ internal class StatisticBase : CounterUsagesCollector() {
     private val LOG = logger<StatisticBase>()
     private val sessionLessonTimestamp: ConcurrentHashMap<String, Long> = ConcurrentHashMap()
     private var prevRestoreLessonProgress: LessonProgress = LessonProgress("", 0)
-    private val GROUP: EventLogGroup = EventLogGroup("ideFeaturesTrainer", 16)
+    private val GROUP: EventLogGroup = EventLogGroup("ideFeaturesTrainer", 18)
 
     var isLearnProjectCloseLogged = false
 
@@ -116,6 +122,7 @@ internal class StatisticBase : CounterUsagesCollector() {
     private val feedbackOpenedViaNotification = EventFields.Boolean(FEEDBACK_OPENED_VIA_NOTIFICATION)
     private val feedbackLikenessAnswer = EventFields.Enum<FeedbackLikenessAnswer>(FEEDBACK_LIKENESS_ANSWER)
     private val feedbackExperiencedUser = EventFields.Boolean(FEEDBACK_EXPERIENCED_USER)
+    private val internalProblemField = EventFields.Enum<LearningInternalProblems>(PROBLEM)
 
     private val lastBuildLearningOpened = object : PrimitiveEventField<String?>() {
       override val name: String = LAST_BUILD_LEARNING_OPENED
@@ -153,6 +160,9 @@ internal class StatisticBase : CounterUsagesCollector() {
       GROUP.registerEvent(SHOW_NEW_LESSONS, newLessonsCount, lastBuildLearningOpened)
     private val needShowNewLessonsNotifications =
       GROUP.registerEvent(NEED_SHOW_NEW_LESSONS_NOTIFICATIONS, newLessonsCount, lastBuildLearningOpened, showNewLessonsState)
+
+    private val internalProblem =
+      GROUP.registerEvent(INTERNAL_PROBLEM, internalProblemField, lessonIdField, languageField)
 
     private val lessonLinkClickedFromTip = GROUP.registerEvent(LESSON_LINK_CLICKED_FROM_TIP, lessonIdField, languageField, tipFilenameField)
     private val helpLinkClicked = GROUP.registerEvent(HELP_LINK_CLICKED, lessonIdField, languageField)
@@ -287,6 +297,10 @@ internal class StatisticBase : CounterUsagesCollector() {
       )
     }
 
+    fun logLearningProblem(problem: LearningInternalProblems, lesson: Lesson) {
+      internalProblem.log(problem, lesson.id, courseLanguage())
+    }
+
     private fun courseLanguage() = LangManager.getInstance().getLangSupport()?.primaryLanguage?.toLowerCase() ?: ""
 
     private fun completedCount(): Int = CourseManager.instance.lessonsForModules.count { it.passed }
@@ -304,8 +318,7 @@ internal class StatisticBase : CounterUsagesCollector() {
     }
 
     private fun getPluginVersion(lesson: Lesson): String? {
-      val pluginId = PluginManagerCore.getPluginByClassName(lesson::class.java.name)
-      return PluginManagerCore.getPlugin(pluginId)?.version
+      return PluginManager.getPluginByClass(lesson::class.java)?.version
     }
 
     private fun getDefaultKeymap(): Keymap? {

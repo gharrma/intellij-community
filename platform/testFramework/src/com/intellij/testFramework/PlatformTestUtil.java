@@ -111,6 +111,7 @@ import java.util.jar.JarFile;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+import static com.intellij.util.ObjectUtils.consumeIfNotNull;
 import static org.junit.Assert.*;
 
 @SuppressWarnings("UseOfSystemOutOrSystemErr")
@@ -152,7 +153,7 @@ public final class PlatformTestUtil {
    */
   public static <T> void maskExtensions(@NotNull ProjectExtensionPointName<T> pointName,
                                         @NotNull Project project,
-                                        @NotNull List<T> newExtensions,
+                                        @NotNull List<? extends T> newExtensions,
                                         @NotNull Disposable parentDisposable) {
     ((ExtensionPointImpl<T>)pointName.getPoint(project)).maskAll(newExtensions, parentDisposable, true);
   }
@@ -178,27 +179,28 @@ public final class PlatformTestUtil {
     return print(tree, path,  withSelection, printInfo, null);
   }
 
-  public static @NotNull String print(@NotNull JTree tree, boolean withSelection, @Nullable Predicate<String> nodePrintCondition) {
+  public static @NotNull String print(@NotNull JTree tree, boolean withSelection, @Nullable Predicate<? super String> nodePrintCondition) {
     return print(tree, new TreePath(tree.getModel().getRoot()), withSelection, null, nodePrintCondition);
   }
 
-  private static String print(JTree tree,
-                              TreePath path,
+  @NotNull
+  private static String print(@NotNull JTree tree,
+                              @NotNull TreePath path,
                               boolean withSelection,
                               @Nullable Queryable.PrintInfo printInfo,
-                              @Nullable Predicate<String> nodePrintCondition) {
+                              @Nullable Predicate<? super String> nodePrintCondition) {
     Collection<String> strings = new ArrayList<>();
     printImpl(tree, path, strings, 0, withSelection, printInfo, nodePrintCondition);
     return String.join("\n", strings);
   }
 
-  private static void printImpl(JTree tree,
-                                TreePath path,
-                                Collection<String> strings,
+  private static void printImpl(@NotNull JTree tree,
+                                @NotNull TreePath path,
+                                @NotNull Collection<? super String> strings,
                                 int level,
                                 boolean withSelection,
                                 @Nullable Queryable.PrintInfo printInfo,
-                                @Nullable Predicate<String> nodePrintCondition) {
+                                @Nullable Predicate<? super String> nodePrintCondition) {
     Object pathComponent = path.getLastPathComponent();
     Object userObject = TreeUtil.getUserObject(pathComponent);
     String nodeText = toString(userObject, printInfo);
@@ -435,8 +437,7 @@ public final class PlatformTestUtil {
                                    "; alarm.disposed=" + alarm.isDisposed() +
                                    "; alarm.requests=" + alarm.getActiveRequestCount() +
                                    "\n delayQueue=" + StringUtil.trimLog(queue, 1000) +
-                                   "\n invocatorEdtQueue=" + LaterInvocator.getLaterInvocatorEdtQueue() +
-                                   "\n invocatorWtQueue=" + LaterInvocator.getLaterInvocatorWtQueue()
+                                   "\n invocatorEdtQueue=" + LaterInvocator.getLaterInvocatorEdtQueue()
           );
         }
       }
@@ -612,7 +613,22 @@ public final class PlatformTestUtil {
   // to warn about not calling .assertTiming() in the end
   @Contract(pure = true)
   public static @NotNull PerformanceTestInfo startPerformanceTest(@NonNls @NotNull String what, int expectedMs, @NotNull ThrowableRunnable<?> test) {
-    return new PerformanceTestInfo(test, expectedMs, what);
+    return startPerformanceTestWithVariableInputSize(what, expectedMs, 1, () -> {
+      test.run();
+      return 1;
+    });
+  }
+
+  /**
+   * Starts a performance test which input (and therefore expected time to execute) may change, e.g. it depends on number of files in the project.
+   * <p>
+   * {@code expectedInputSize} parameter specifies size of the input for which the test is expected to finish in {@code expectedMs} milliseconds,
+   * {@code test} returns actual size of the input. It is supposed that the execution time is lineally proportionally dependent on the input size.
+   * </p>
+   */
+  @Contract(pure = true)
+  public static @NotNull PerformanceTestInfo startPerformanceTestWithVariableInputSize(@NonNls @NotNull String what, int expectedMs, int expectedInputSize, @NotNull ThrowableComputable<Integer, ?> test) {
+    return new PerformanceTestInfo(test, expectedMs, expectedInputSize, what);
   }
 
   public static void assertPathsEqual(@Nullable String expected, @Nullable String actual) {
@@ -1060,7 +1076,7 @@ public final class PlatformTestUtil {
   public static @NotNull Pair<@NotNull ExecutionEnvironment, RunContentDescriptor> executeConfiguration(
     @NotNull RunConfiguration runConfiguration,
     @NotNull String executorId,
-    @Nullable Consumer<RunContentDescriptor> contentDescriptorProcessor)
+    @Nullable Consumer<? super RunContentDescriptor> contentDescriptorProcessor)
     throws InterruptedException {
     Executor executor = ExecutorRegistry.getInstance().getExecutorById(executorId);
     assertNotNull("Unable to find executor: " + executorId, executor);
@@ -1129,19 +1145,29 @@ public final class PlatformTestUtil {
     waitWithEventsDispatching(() -> errorMessage, condition, timeoutInSeconds);
   }
 
-  /**
-   * Wait and dispatch events during timeout
-   */
   public static void waitWithEventsDispatching(@NotNull Supplier<String> errorMessageSupplier,
                                                @NotNull BooleanSupplier condition,
                                                int timeoutInSeconds) {
+    waitWithEventsDispatching(errorMessageSupplier, condition, timeoutInSeconds, null);
+  }
+
+  /**
+   * Wait and dispatch events during timeout.
+   * A {@link Runnable} callback may be provided to be executed when {@code condition} gets satisfied or {@code timeoutInSeconds} runs out.
+   */
+  public static void waitWithEventsDispatching(@NotNull Supplier<String> errorMessageSupplier,
+                                               @NotNull BooleanSupplier condition,
+                                               int timeoutInSeconds,
+                                               @Nullable Runnable callback) {
     long start = System.currentTimeMillis();
     while (true) {
       try {
         if (System.currentTimeMillis() - start > timeoutInSeconds * 1000L) {
+          consumeIfNotNull(callback, Runnable::run);
           fail(errorMessageSupplier.get());
         }
         if (condition.getAsBoolean()) {
+          consumeIfNotNull(callback, Runnable::run);
           break;
         }
         dispatchAllEventsInIdeEventQueue();

@@ -2,6 +2,7 @@
 
 package org.jetbrains.kotlin.idea.quickfix
 
+import com.intellij.codeInsight.intention.FileModifier.SafeFieldForPreview
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiElement
@@ -17,6 +18,7 @@ import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 
 open class AddModifierFix(
     element: KtModifierListOwner,
+    @SafeFieldForPreview
     protected val modifier: KtModifierKeywordToken
 ) : KotlinCrossLanguageQuickFixAction<KtModifierListOwner>(element), KotlinUniversalQuickFix {
     override fun getText(): String {
@@ -66,7 +68,7 @@ open class AddModifierFix(
             }
         }
 
-        fun createIfApplicable(modifierListOwner: KtModifierListOwner, modifier: KtModifierKeywordToken): AddModifierFix? {
+        fun createIfApplicable(modifierListOwner: KtModifierListOwner, modifier: KtModifierKeywordToken): T? {
             when (modifier) {
                 KtTokens.ABSTRACT_KEYWORD, KtTokens.OPEN_KEYWORD -> {
                     if (modifierListOwner is KtObjectDeclaration) return null
@@ -96,10 +98,7 @@ open class AddModifierFix(
             return createModifierFix(modifierListOwner, modifier)
         }
 
-        fun createModifierFix(
-            element: KtModifierListOwner,
-            modifier: KtModifierKeywordToken
-        ): T
+        fun createModifierFix(element: KtModifierListOwner, modifier: KtModifierKeywordToken): T
     }
 
     companion object : Factory<AddModifierFix> {
@@ -110,12 +109,10 @@ open class AddModifierFix(
         val addInnerModifier = createFactory(KtTokens.INNER_KEYWORD)
         val addOverrideModifier = createFactory(KtTokens.OVERRIDE_KEYWORD)
 
-        val modifiersWithWarning = setOf(KtTokens.ABSTRACT_KEYWORD, KtTokens.FINAL_KEYWORD)
-
+        val modifiersWithWarning: Set<KtModifierKeywordToken> = setOf(KtTokens.ABSTRACT_KEYWORD, KtTokens.FINAL_KEYWORD)
         private val modalityModifiers = modifiersWithWarning + KtTokens.OPEN_KEYWORD
 
         override fun createModifierFix(element: KtModifierListOwner, modifier: KtModifierKeywordToken): AddModifierFix =
             AddModifierFix(element, modifier)
-
     }
 }

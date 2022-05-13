@@ -6,36 +6,34 @@ import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.roots.DependencyScope
 import com.intellij.openapi.roots.ExternalLibraryDescriptor
 import com.intellij.openapi.roots.ProjectRootManager
+import com.intellij.psi.PsiElement
+import com.intellij.psi.PsiFile
 import com.intellij.psi.util.PsiTreeUtil
 import org.jetbrains.kotlin.diagnostics.Diagnostic
 import org.jetbrains.kotlin.diagnostics.Errors
 import org.jetbrains.kotlin.idea.KotlinJvmBundle
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinPluginLayout
 import org.jetbrains.kotlin.idea.configuration.findApplicableConfigurator
 import org.jetbrains.kotlin.idea.facet.getCleanRuntimeLibraryVersion
 import org.jetbrains.kotlin.idea.quickfix.KotlinQuickFixAction
 import org.jetbrains.kotlin.idea.quickfix.KotlinSingleIntentionActionFactory
 import org.jetbrains.kotlin.idea.util.createIntentionForFirstParentOfType
 import org.jetbrains.kotlin.idea.versions.LibraryJarDescriptor
-import org.jetbrains.kotlin.idea.versions.bundledRuntimeVersion
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtElement
 import org.jetbrains.kotlin.psi.KtFile
 import org.jetbrains.kotlin.psi.KtImportDirective
 
-class AddReflectionQuickFix(element: KtElement) : AddKotlinLibQuickFix(
-    element, listOf(
-        LibraryJarDescriptor.REFLECT_JAR,
-        LibraryJarDescriptor.REFLECT_SRC_JAR
-    )
-) {
+class AddReflectionQuickFix(element: KtElement) : AddKotlinLibQuickFix(element, LibraryJarDescriptor.REFLECT_JAR, DependencyScope.COMPILE) {
     override fun getText() = KotlinJvmBundle.message("classpath.add.reflection")
     override fun getFamilyName() = text
 
     override fun getLibraryDescriptor(module: Module) = MavenExternalLibraryDescriptor(
         "org.jetbrains.kotlin", "kotlin-reflect",
-        getCleanRuntimeLibraryVersion(module) ?: bundledRuntimeVersion()
+        getCleanRuntimeLibraryVersion(module) ?: KotlinPluginLayout.instance.standaloneCompilerVersion
     )
 
     companion object : KotlinSingleIntentionActionFactory() {
@@ -43,13 +41,17 @@ class AddReflectionQuickFix(element: KtElement) : AddKotlinLibQuickFix(
     }
 }
 
-class AddScriptRuntimeQuickFix(element: KtElement) : AddKotlinLibQuickFix(element, listOf(LibraryJarDescriptor.SCRIPT_RUNTIME_JAR)) {
+class AddScriptRuntimeQuickFix(element: KtElement) : AddKotlinLibQuickFix(
+    element,
+    LibraryJarDescriptor.SCRIPT_RUNTIME_JAR,
+    DependencyScope.COMPILE
+) {
     override fun getText() = KotlinJvmBundle.message("classpath.add.script.runtime")
     override fun getFamilyName() = text
 
     override fun getLibraryDescriptor(module: Module) = MavenExternalLibraryDescriptor(
         "org.jetbrains.kotlin", "kotlin-script-runtime",
-        getCleanRuntimeLibraryVersion(module) ?: bundledRuntimeVersion()
+        getCleanRuntimeLibraryVersion(module) ?: KotlinPluginLayout.instance.standaloneCompilerVersion
     )
 
     companion object : KotlinSingleIntentionActionFactory() {
@@ -59,18 +61,13 @@ class AddScriptRuntimeQuickFix(element: KtElement) : AddKotlinLibQuickFix(elemen
     }
 }
 
-class AddTestLibQuickFix(element: KtElement) : AddKotlinLibQuickFix(
-    element, listOf(
-        LibraryJarDescriptor.TEST_JAR,
-        LibraryJarDescriptor.TEST_SRC_JAR
-    )
-) {
+class AddTestLibQuickFix(element: KtElement) : AddKotlinLibQuickFix(element, LibraryJarDescriptor.TEST_JAR, DependencyScope.TEST) {
     override fun getText() = KotlinJvmBundle.message("classpath.add.kotlin.test")
     override fun getFamilyName() = text
 
     override fun getLibraryDescriptor(module: Module) = MavenExternalLibraryDescriptor(
         "org.jetbrains.kotlin", "kotlin-test",
-        getCleanRuntimeLibraryVersion(module) ?: bundledRuntimeVersion()
+        getCleanRuntimeLibraryVersion(module) ?: KotlinPluginLayout.instance.standaloneCompilerVersion
     )
 
     companion object : KotlinSingleIntentionActionFactory() {
@@ -119,7 +116,8 @@ class AddTestLibQuickFix(element: KtElement) : AddKotlinLibQuickFix(
 
 abstract class AddKotlinLibQuickFix(
     element: KtElement,
-    val libraryJarDescriptors: List<LibraryJarDescriptor>
+    private val libraryJarDescriptor: LibraryJarDescriptor,
+    private val scope: DependencyScope
 ) : KotlinQuickFixAction<KtElement>(element) {
     protected abstract fun getLibraryDescriptor(module: Module): MavenExternalLibraryDescriptor
 
@@ -133,6 +131,8 @@ abstract class AddKotlinLibQuickFix(
         val module = ProjectRootManager.getInstance(project).fileIndex.getModuleForFile(element.containingFile.virtualFile) ?: return
 
         val configurator = findApplicableConfigurator(module)
-        configurator.addLibraryDependency(module, element, getLibraryDescriptor(module), libraryJarDescriptors)
+        configurator.addLibraryDependency(module, element, getLibraryDescriptor(module), libraryJarDescriptor, scope)
     }
+
+    override fun getElementToMakeWritable(currentFile: PsiFile): PsiElement? = null
 }

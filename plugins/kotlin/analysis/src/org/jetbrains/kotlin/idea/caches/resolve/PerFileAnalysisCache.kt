@@ -249,13 +249,21 @@ internal class PerFileAnalysisCache(val file: KtFile, componentProvider: Compone
     ): AnalysisResult {
         val newBindingCtx = elementBindingTrace.stackedContext
         return when {
-            oldResult.isError() -> AnalysisResult.internalError(newBindingCtx, oldResult.error)
-            newResult.isError() -> AnalysisResult.internalError(newBindingCtx, newResult.error)
-            else -> AnalysisResult.success(
-                newBindingCtx,
-                oldResult.moduleDescriptor,
-                oldResult.shouldGenerateCode
-            )
+            oldResult.isError() -> {
+                oldResult.error.throwAsInvalidModuleException()
+                AnalysisResult.internalError(newBindingCtx, oldResult.error)
+            }
+            newResult.isError() -> {
+                newResult.error.throwAsInvalidModuleException()
+                AnalysisResult.internalError(newBindingCtx, newResult.error)
+            }
+            else -> {
+                AnalysisResult.success(
+                    newBindingCtx,
+                    oldResult.moduleDescriptor,
+                    oldResult.shouldGenerateCode
+                )
+            }
         }
     }
 
@@ -372,12 +380,6 @@ private class StackedCompositeBindingContextTrace(
         val all = parentContext.diagnostics.all()
         val filtered = all.filter { it.psiElement == element && selfDiagnosticToHold(it) } + all.filter { it.psiElement.parentsWithSelf.none { e -> e == element } }
         filtered
-    }
-
-    override fun setCallback(callback: DiagnosticSink.DiagnosticsCallback) {
-        if (diagnosticsCallback == null) {
-            super.setCallback(callback)
-        }
     }
 
     inner class StackedCompositeBindingContext : BindingContext {
@@ -516,11 +518,9 @@ private object KotlinResolveDataProvider {
 
             val targetPlatform = moduleInfo.platform
 
+            var callbackSet = false
             try {
-                trace.resetCallback()
-                callback?.let {
-                    trace.setCallback(it)
-                }
+                callbackSet = callback?.let(trace::setCallbackIfNotSet) ?: false
                 /*
                 Note that currently we *have* to re-create LazyTopDownAnalyzer with custom trace in order to disallow resolution of
                 bodies in top-level trace (trace from DI-container).
@@ -548,7 +548,9 @@ private object KotlinResolveDataProvider {
 
                 lazyTopDownAnalyzer.analyzeDeclarations(TopDownAnalysisMode.TopLevelDeclarations, listOf(analyzableElement))
             } finally {
-                trace.resetCallback()
+                if (callbackSet) {
+                    trace.resetCallback()
+                }
             }
 
             return AnalysisResult.success(trace.bindingContext, moduleDescriptor)

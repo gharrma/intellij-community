@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ui.jcef;
 
 import com.intellij.application.options.RegistryManager;
@@ -33,10 +33,12 @@ import org.cef.handler.CefAppHandlerAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.awt.*;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -55,12 +57,12 @@ public final class JBCefApp {
   private static final Logger LOG = Logger.getInstance(JBCefApp.class);
 
   public static final @NotNull NotNullLazyValue<NotificationGroup> NOTIFICATION_GROUP = NotNullLazyValue.createValue(() -> {
-    return NotificationGroup.create("JCEF", NotificationDisplayType.BALLOON, true, null, null, null, null);
+    return NotificationGroup.create("JCEF", NotificationDisplayType.BALLOON, true, null, null, null);
   });
 
   private static final String MISSING_LIBS_SUPPORT_URL = "https://intellij-support.jetbrains.com/hc/en-us/articles/360016421559";
 
-  private static final int MIN_SUPPORTED_CEF_MAJOR_VERSION = 89;
+  private static final int MIN_SUPPORTED_CEF_MAJOR_VERSION = 97;
   private static final int MIN_SUPPORTED_JCEF_API_MAJOR_VERSION = 1;
   private static final int MIN_SUPPORTED_JCEF_API_MINOR_VERSION = 5;
 
@@ -305,7 +307,7 @@ public final class JBCefApp {
       if (!RegistryManager.getInstance().is("ide.browser.jcef.enabled")) {
         return unsupported.apply("JCEF is manually disabled via 'ide.browser.jcef.enabled=false'");
       }
-      if (ApplicationManager.getApplication().isHeadlessEnvironment() &&
+      if (GraphicsEnvironment.isHeadless() &&
           !RegistryManager.getInstance().is("ide.browser.jcef.headless.enabled"))
       {
         return unsupported.apply("JCEF is manually disabled in headless env via 'ide.browser.jcef.headless.enabled=false'");
@@ -458,7 +460,7 @@ public final class JBCefApp {
         JBCefFileSchemeHandlerFactory.FILE_SCHEME_NAME, "", new JBCefFileSchemeHandlerFactory());
     }
 
-    @Override
+    //@Override
     public void onBeforeChildProcessLaunch(String command_line) {
       if (myGPUCrashLimit >= 0 && command_line != null && command_line.contains("--type=gpu-process")) {
         if (++myGPUCrashCounter > myGPUCrashLimit && !myNotificationShown) {

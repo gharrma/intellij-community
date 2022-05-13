@@ -1,5 +1,5 @@
 // PROBLEM: none
-// WITH_RUNTIME
+// WITH_STDLIB
 // See KTIJ-19621
 fun test(): Int = <caret>with("") {
     println()

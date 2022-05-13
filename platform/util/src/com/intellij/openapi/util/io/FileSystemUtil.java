@@ -372,8 +372,9 @@ public final class FileSystemUtil {
 
         Class<? extends BasicFileAttributes> schema = SystemInfo.isWindows ? DosFileAttributes.class : PosixFileAttributes.class;
         BasicFileAttributes attributes = Files.readAttributes(path, schema, myNoFollowLinkOptions);
-        boolean isSymbolicLink =
-          attributes.isSymbolicLink() || SystemInfo.isWindows && attributes.isOther() && attributes.isDirectory() && path.getParent() != null;
+        boolean isSymbolicLink = attributes != null &&
+                                 (attributes.isSymbolicLink() ||
+                                  SystemInfo.isWindows && attributes.isOther() && attributes.isDirectory() && path.getParent() != null);
         if (isSymbolicLink) {
           try {
             attributes = Files.readAttributes(path, schema);
@@ -381,6 +382,9 @@ public final class FileSystemUtil {
           catch (NoSuchFileException e) {
             return FileAttributes.BROKEN_SYMLINK;
           }
+        }
+        if (attributes == null) {
+          return null;
         }
 
         boolean isDirectory = attributes.isDirectory();
@@ -664,12 +668,16 @@ public final class FileSystemUtil {
         PointerByReference resultPtr = new PointerByReference(), errorPtr = new PointerByReference();
         Pointer result;
         if (!cf.CFURLCopyResourcePropertyForKey(url, CoreFoundation.kCFURLVolumeSupportsCaseSensitiveNamesKey, resultPtr, errorPtr)) {
-          Pointer error = errorPtr.getValue();
-          String description = error != null ? cf.CFErrorGetDomain(error).stringValue() + '/' + cf.CFErrorGetCode(error) : "error";
-          LOG.warn("CFURLCopyResourcePropertyForKey(" + path + "): " + description);
+          if (LOG.isDebugEnabled()) {
+            Pointer error = errorPtr.getValue();
+            String description = error != null ? cf.CFErrorGetDomain(error).stringValue() + '/' + cf.CFErrorGetCode(error) : "error";
+            LOG.debug("CFURLCopyResourcePropertyForKey(" + path + "): " + description);
+          }
         }
         else if ((result = resultPtr.getValue()) == null) {
-          LOG.info("CFURLCopyResourcePropertyForKey(" + path + "): property not available");
+          if (LOG.isDebugEnabled()) {
+            LOG.debug("CFURLCopyResourcePropertyForKey(" + path + "): property not available");
+          }
         }
         else {
           boolean value = new CoreFoundation.CFBooleanRef(result).booleanValue();

@@ -1,5 +1,5 @@
 // IS_APPLICABLE: false
-// WITH_RUNTIME
+// WITH_STDLIB
 @Target(AnnotationTarget.TYPE)
 annotation class Foo(val value: String)
 

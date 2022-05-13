@@ -30,7 +30,10 @@ import com.intellij.psi.PsiFile;
 import com.intellij.psi.PsiWhiteSpace;
 import com.intellij.psi.util.PsiTreeUtil;
 import com.intellij.util.ObjectUtils;
+import com.intellij.util.PairProcessor;
 import com.intellij.util.containers.ContainerUtil;
+import org.jetbrains.annotations.Nls;
+import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -47,12 +50,12 @@ final class DoNotShowInspectionIntentionMenuContributor implements IntentionMenu
                              int passIdToShowIntentionsFor,
                              int offset) {
     Project project = hostFile.getProject();
-    final PsiElement psiElement = hostFile.findElementAt(offset);
+    PsiElement psiElement = hostFile.findElementAt(offset);
     if (HighlightingLevelManager.getInstance(project).shouldInspect(hostFile)) {
       PsiElement intentionElement = psiElement;
       int intentionOffset = offset;
       if (psiElement instanceof PsiWhiteSpace && offset == psiElement.getTextRange().getStartOffset() && offset > 0) {
-        final PsiElement prev = hostFile.findElementAt(offset - 1);
+        PsiElement prev = hostFile.findElementAt(offset - 1);
         if (prev != null && prev.isValid()) {
           intentionElement = prev;
           intentionOffset = offset - 1;
@@ -68,11 +71,11 @@ final class DoNotShowInspectionIntentionMenuContributor implements IntentionMenu
   /**
    * Can be invoked in EDT, each inspection should be fast
    */
-  private static void collectIntentionsFromDoNotShowLeveledInspections(final @NotNull Project project,
-                                                                       final @NotNull PsiFile hostFile,
+  private static void collectIntentionsFromDoNotShowLeveledInspections(@NotNull Project project,
+                                                                       @NotNull PsiFile hostFile,
                                                                        @NotNull PsiElement psiElement,
-                                                                       final int offset,
-                                                                       final @NotNull ShowIntentionsPass.IntentionsInfo outIntentions) {
+                                                                       int offset,
+                                                                       @NotNull ShowIntentionsPass.IntentionsInfo outIntentions) {
     if (!psiElement.isPhysical()) {
       VirtualFile virtualFile = hostFile.getVirtualFile();
       String text = hostFile.getText();
@@ -92,7 +95,7 @@ final class DoNotShowInspectionIntentionMenuContributor implements IntentionMenu
         toolWrapper = ((GlobalInspectionToolWrapper)toolWrapper).getSharedLocalInspectionToolWrapper();
       }
       if (toolWrapper instanceof LocalInspectionToolWrapper && !((LocalInspectionToolWrapper)toolWrapper).isUnfair()) {
-        final HighlightDisplayKey key = HighlightDisplayKey.find(toolWrapper.getShortName());
+        HighlightDisplayKey key = HighlightDisplayKey.find(toolWrapper.getShortName());
         if (profile.isToolEnabled(key, hostFile) &&
             HighlightDisplayLevel.DO_NOT_SHOW.equals(profile.getErrorLevel(key, hostFile))) {
           intentionTools.add((LocalInspectionToolWrapper)toolWrapper);
@@ -112,21 +115,20 @@ final class DoNotShowInspectionIntentionMenuContributor implements IntentionMenu
       elements.addAll(parentsOnTheLeft);
     }
 
-    Map<String, String> displayNames =
+    Map<@NonNls String, @Nls(capitalization = Nls.Capitalization.Sentence) String> displayNames =
       ContainerUtil.map2Map(intentionTools, wrapper -> Pair.create(wrapper.getShortName(), wrapper.getDisplayName()));
 
     // indicator can be null when run from EDT
     ProgressIndicator progress = ObjectUtils.notNull(ProgressIndicatorProvider.getGlobalProgressIndicator(), new DaemonProgressIndicator());
-    Map<String, List<ProblemDescriptor>> map =
-      InspectionEngine.inspectElements(intentionTools, hostFile, InspectionManager.getInstance(project), true, progress, elements,
-                                       InspectionEngine.calcElementDialectIds(elements));
+    Map<LocalInspectionToolWrapper, List<ProblemDescriptor>> map =
+      InspectionEngine.inspectElements(intentionTools, hostFile, hostFile.getTextRange(), true, true, progress, elements, PairProcessor.alwaysTrue());
 
-    for (Map.Entry<String, List<ProblemDescriptor>> entry : map.entrySet()) {
+    for (Map.Entry<LocalInspectionToolWrapper, List<ProblemDescriptor>> entry : map.entrySet()) {
       List<ProblemDescriptor> descriptors = entry.getValue();
-      String shortName = entry.getKey();
+      String shortName = entry.getKey().getShortName();
       for (ProblemDescriptor problemDescriptor : descriptors) {
         if (problemDescriptor instanceof ProblemDescriptorBase) {
-          final TextRange range = ((ProblemDescriptorBase)problemDescriptor).getTextRange();
+          TextRange range = ((ProblemDescriptorBase)problemDescriptor).getTextRange();
           if (range != null && range.containsOffset(offset)) {
             QuickFix[] fixes = problemDescriptor.getFixes();
             if (fixes != null) {

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection.reference;
 
 import com.intellij.lang.java.JavaLanguage;
@@ -45,6 +45,11 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
 
   RefMethodImpl(UMethod method, PsiElement psi, RefManager manager) {
     super(method, psi, manager);
+
+    setConstructor(method.isConstructor());
+    PsiType returnType = method.getReturnType();
+    setFlag(returnType == null || PsiType.VOID.equals(returnType) ||
+            returnType.equalsToText(CommonClassNames.JAVA_LANG_VOID), IS_RETURN_VALUE_USED_MASK);
   }
 
   // To be used only from RefImplicitConstructor!
@@ -114,12 +119,6 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
     if (!myManager.isDeclarationsFound()) return;
 
     PsiMethod javaPsi = method.getJavaPsi();
-    setConstructor(method.isConstructor());
-    final PsiType returnType = method.getReturnType();
-    setFlag(returnType == null ||
-            PsiType.VOID.equals(returnType) ||
-            returnType.equalsToText(CommonClassNames.JAVA_LANG_VOID), IS_RETURN_VALUE_USED_MASK);
-
     RefClass ownerClass = ObjectUtils.tryCast(parentRef, RefClass.class);
     if (!isConstructor()) {
       if (ownerClass != null && ownerClass.isInterface()) {
@@ -154,9 +153,11 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
 
   public void setParametersAreUnknown() {
     for (RefParameter parameter : getParameters()) {
+      parameter.waitForInitialized();
       ((RefParameterImpl)parameter).clearTemplateValue();
     }
     for (RefMethod method : getSuperMethods()) {
+      method.waitForInitialized();
       ((RefMethodImpl)method).setParametersAreUnknown();
     }
   }
@@ -167,6 +168,9 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
 
     PsiMethod appMainPattern = ((RefMethodImpl)refMethod).getRefJavaManager().getAppMainPattern();
     if (MethodSignatureUtil.areSignaturesEqual(psiMethod, appMainPattern)) return true;
+
+    if ("main".equals(psiMethod.getName()) && psiMethod.getParameterList().isEmpty() &&
+        "Kotlin".equals(psiMethod.getContainingFile().getFileType().getName())) return true;
 
     PsiMethod appPremainPattern = ((RefMethodImpl)refMethod).getRefJavaManager().getAppPremainPattern();
     if (MethodSignatureUtil.areSignaturesEqual(psiMethod, appPremainPattern)) return true;
@@ -516,6 +520,7 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
     if (checkFlag(IS_RETURN_VALUE_USED_MASK) == value) return;
     setFlag(value, IS_RETURN_VALUE_USED_MASK);
     for (RefMethod refSuper : getSuperMethods()) {
+      refSuper.waitForInitialized();
       ((RefMethodImpl)refSuper).setReturnValueUsed(value);
     }
   }
@@ -535,6 +540,7 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
     if (!getSuperMethods().isEmpty()) {
       for (final RefMethod refMethod : getSuperMethods()) {
         RefMethodImpl refSuper = (RefMethodImpl)refMethod;
+        refSuper.waitForInitialized();
         refSuper.updateReturnValueTemplate(expression);
       }
     }
@@ -580,6 +586,7 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
 
     if (!getSuperMethods().isEmpty()) {
       for (RefMethod refSuper : getSuperMethods()) {
+        refSuper.waitForInitialized();
         ((RefMethodImpl)refSuper).updateParameterValues(args, null);
       }
     }
@@ -604,9 +611,12 @@ public class RefMethodImpl extends RefJavaElementImpl implements RefMethod {
 
   public void updateThrowsList(PsiClassType exceptionType) {
     LOG.assertTrue(isInitialized());
-    for (RefMethod refSuper : getSuperMethods()) {
-      ((RefMethodImpl)refSuper).updateThrowsList(exceptionType);
-    }
+    myManager.executeTask(() -> {
+      for (RefMethod refSuper : getSuperMethods()) {
+        refSuper.waitForInitialized();
+        ((RefMethodImpl)refSuper).updateThrowsList(exceptionType);
+      }
+    });
     synchronized (this) {
       List<String> unThrownExceptions = myUnThrownExceptions;
       if (unThrownExceptions != null) {

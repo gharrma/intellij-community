@@ -1,5 +1,5 @@
 // "Opt in for 'B' on 'root'" "true"
-// WITH_RUNTIME
+// WITH_STDLIB
 @RequiresOptIn
 annotation class A
 

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.findUsages.handlers
 
@@ -10,7 +10,6 @@ import com.intellij.find.impl.FindManagerImpl
 import com.intellij.icons.AllIcons.Actions
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.DataContext
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
@@ -73,8 +72,7 @@ abstract class KotlinFindMemberUsagesHandler<T : KtNamedDeclaration> protected c
             if (factory.findFunctionOptions.isSearchForBaseMethod) {
                 val supers = KotlinFindUsagesSupport.getSuperMethods(psiElement as KtFunction, null)
                 if (supers.contains(psiElement)) supers.toTypedArray() else (supers + psiElement).toTypedArray()
-            }
-            else super.getPrimaryElements()
+            } else super.getPrimaryElements()
 
         override fun getFindUsagesDialog(
             isSingleFile: Boolean,
@@ -159,8 +157,7 @@ abstract class KotlinFindMemberUsagesHandler<T : KtNamedDeclaration> protected c
                         }
                     }
                 }
-            }
-            else if (factory.findPropertyOptions.isSearchForBaseAccessors) {
+            } else if (factory.findPropertyOptions.isSearchForBaseAccessors) {
                 val supers = KotlinFindUsagesSupport.getSuperMethods(element, null)
                 return if (supers.contains(psiElement)) supers.toTypedArray() else (supers + psiElement).toTypedArray()
             }
@@ -276,7 +273,7 @@ abstract class KotlinFindMemberUsagesHandler<T : KtNamedDeclaration> protected c
                     // TODO: very bad code!! ReferencesSearch does not work correctly for constructors and annotation parameters
                     val psiMethodScopeSearch = when {
                         element is KtParameter && element.isDataClassComponentFunction ->
-                            options.searchScope.excludeKotlinSources()
+                            options.searchScope.excludeKotlinSources(project)
                         else -> options.searchScope
                     }
 

@@ -2,6 +2,7 @@
 package org.jetbrains.kotlin.idea.maven.importer
 
 import org.jetbrains.kotlin.idea.artifacts.KotlinArtifacts
+import org.jetbrains.kotlin.idea.maven.AbstractKotlinMavenImporterTest
 import org.junit.Test
 import org.junit.internal.runners.JUnit38ClassRunner
 import org.junit.runner.RunWith

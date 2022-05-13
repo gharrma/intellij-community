@@ -10,7 +10,6 @@ import com.intellij.openapi.externalSystem.service.project.wizard.MavenizedNewPr
 import com.intellij.openapi.externalSystem.util.ExternalSystemBundle
 import com.intellij.openapi.externalSystem.util.ui.DataView
 import com.intellij.openapi.module.StdModuleTypes
-import com.intellij.openapi.observable.properties.GraphPropertyImpl.Companion.graphProperty
 import com.intellij.openapi.projectRoots.JavaSdkType
 import com.intellij.openapi.projectRoots.Sdk
 import com.intellij.openapi.projectRoots.SdkTypeId
@@ -30,15 +29,15 @@ import org.jetbrains.plugins.gradle.util.*
 import javax.swing.Icon
 
 abstract class GradleNewProjectWizardStep<ParentStep>(parent: ParentStep) :
-  MavenizedNewProjectWizardStep<ProjectData, ParentStep>(parent)
+  MavenizedNewProjectWizardStep<ProjectData, ParentStep>(parent), GradleNewProjectWizardData
   where ParentStep : NewProjectWizardStep,
         ParentStep : NewProjectWizardBaseData {
 
-  private val sdkProperty = propertyGraph.graphProperty<Sdk?> { null }
-  private val useKotlinDslProperty = propertyGraph.graphProperty { false }
+  final override val sdkProperty = propertyGraph.property<Sdk?>(null)
+  final override val useKotlinDslProperty = propertyGraph.property(false)
 
-  val sdk by sdkProperty
-  var useKotlinDsl by useKotlinDslProperty
+  final override var sdk by sdkProperty
+  final override var useKotlinDsl by useKotlinDslProperty
 
   override fun createView(data: ProjectData) = GradleDataView(data)
 
@@ -51,12 +50,12 @@ abstract class GradleNewProjectWizardStep<ParentStep>(parent: ParentStep) :
           .columns(COLUMNS_MEDIUM)
       }.bottomGap(BottomGap.SMALL)
       row(GradleBundle.message("gradle.dsl.new.project.wizard")) {
-        segmentedButton(listOf(false, true), useKotlinDslProperty) {
+        segmentedButton(listOf(false, true)) {
           when (it) {
             true -> GradleBundle.message("gradle.dsl.new.project.wizard.kotlin")
             else -> GradleBundle.message("gradle.dsl.new.project.wizard.groovy")
           }
-        }
+        }.bind(useKotlinDslProperty)
       }.bottomGap(BottomGap.SMALL)
     }
     super.setupUI(builder)
@@ -71,10 +70,6 @@ abstract class GradleNewProjectWizardStep<ParentStep>(parent: ParentStep) :
   }
 
   override fun ValidationInfoBuilder.validateArtifactId(): ValidationInfo? {
-    if (artifactId.isEmpty()) {
-      return error(ExternalSystemBundle.message("external.system.mavenized.structure.wizard.artifact.id.missing.error",
-        if (context.isCreatingNewProject) 1 else 0))
-    }
     if (artifactId != parentStep.name) {
       return error(ExternalSystemBundle.message("external.system.mavenized.structure.wizard.name.and.artifact.id.is.different.error",
         if (context.isCreatingNewProject) 1 else 0))

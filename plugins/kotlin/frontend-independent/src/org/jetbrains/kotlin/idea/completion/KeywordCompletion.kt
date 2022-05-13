@@ -15,7 +15,6 @@ import com.intellij.psi.filters.*
 import com.intellij.psi.filters.position.LeftNeighbour
 import com.intellij.psi.filters.position.PositionElementFilter
 import com.intellij.psi.tree.IElementType
-import com.intellij.psi.tree.TokenSet
 import com.intellij.psi.util.parentOfType
 import com.intellij.psi.util.parentOfTypes
 import org.jetbrains.kotlin.KtNodeTypes
@@ -57,9 +56,6 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
     companion object {
         private val ALL_KEYWORDS = (KEYWORDS.types + SOFT_KEYWORDS.types)
             .map { it as KtKeywordToken }
-
-        private val KEYWORDS_TO_IGNORE_PREFIX =
-            TokenSet.create(OVERRIDE_KEYWORD /* it's needed to complete overrides that should be work by member name too */)
 
         private val INCOMPATIBLE_KEYWORDS_AROUND_SEALED = setOf(
             SEALED_KEYWORD,
@@ -132,7 +128,7 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
 
     private fun KtKeywordToken.getNextPossibleKeywords(position: PsiElement): Set<KtKeywordToken>? {
         return when {
-            this == SUSPEND_KEYWORD && position.getStrictParentOfType<KtTypeReference>() != null -> null
+            this == SUSPEND_KEYWORD && position.isInsideKtTypeReference -> null
             else -> COMPOUND_KEYWORDS[this]
         }
     }
@@ -369,6 +365,37 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
                     }
                 }
 
+                // for type references in places like 'listOf<' or 'List<' we want to filter almost all keywords
+                // (except maybe for 'suspend' and 'in'/'out', since they can be a part of a type reference)
+                is KtTypeReference -> {
+                    val shouldIntroduceTypeReferenceContext = when {
+
+                        // it can be a receiver type, or it can be a declaration's name,
+                        // so we don't want to change the context
+                        parent.isExtensionReceiverInCallableDeclaration -> false
+
+                        // it is probably an annotation entry, or a super class constructor's invocation,
+                        // in this case we don't want to change the context
+                        parent.parent is KtConstructorCalleeExpression -> false
+
+                        else -> true
+                    }
+
+                    if (shouldIntroduceTypeReferenceContext) {
+
+                        // we cannot just search for an outer element of KtTypeReference type, because
+                        // we can be inside the lambda type args (e.g. 'val foo: (bar: <caret>) -> Unit');
+                        // that's why we have to do a more precise check
+                        val prefixText = if (parent.isTypeArgumentOfOuterKtTypeReference) {
+                            "fun foo(x: X<"
+                        } else {
+                            "fun foo(x: "
+                        }
+
+                        return buildFilterWithContext(prefixText, contextElement = parent, position)
+                    }
+                }
+
                 is KtDeclaration -> {
                     when (parent.parent) {
                         is KtClassOrObject -> {
@@ -391,6 +418,21 @@ class KeywordCompletion(private val languageVersionSettingProvider: LanguageVers
 
         return buildFilterWithReducedContext("", null, position)
     }
+
+    private val KtTypeReference.isExtensionReceiverInCallableDeclaration: Boolean
+        get() {
+            val parent = parent
+            return parent is KtCallableDeclaration && parent.receiverTypeReference == this
+        }
+
+    private val KtTypeReference.isTypeArgumentOfOuterKtTypeReference: Boolean
+        get() {
+            val typeProjection = parent as? KtTypeProjection
+            val typeArgumentList = typeProjection?.parent as? KtTypeArgumentList
+            val userType = typeArgumentList?.parent as? KtUserType
+
+            return userType?.parent is KtTypeReference
+        }
 
     private fun computeKeywordApplications(prefixText: String, keyword: KtKeywordToken): Sequence<String> = when (keyword) {
         SUSPEND_KEYWORD -> sequenceOf("suspend () -> Unit>", "suspend X")

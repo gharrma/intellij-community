@@ -3,6 +3,7 @@ package com.intellij.codeInsight.hints.settings
 
 import com.intellij.codeInsight.hints.*
 import com.intellij.codeInsight.hints.settings.language.createEditor
+import com.intellij.lang.IdeLanguageCustomization
 import com.intellij.lang.Language
 import com.intellij.lang.LanguageUtil
 import com.intellij.openapi.application.ApplicationManager
@@ -13,6 +14,8 @@ import com.intellij.openapi.editor.colors.EditorColorsManager
 import com.intellij.openapi.fileTypes.PlainTextFileType
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Condition
+import com.intellij.openapi.util.Key
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.util.text.StringUtil
 import com.intellij.ui.*
 import com.intellij.util.concurrency.AppExecutorUtil
@@ -33,36 +36,61 @@ import javax.swing.tree.DefaultMutableTreeNode
 import javax.swing.tree.DefaultTreeModel
 import javax.swing.tree.TreeNode
 
+val CASE_KEY = Key.create<ImmediateConfigurable.Case>("inlay.case.key")
+
 class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
 
   val tree: CheckboxTree
   private val rightPanel: JPanel = JPanel(MigLayout("wrap, insets 0 10 0 0, gapy 20, fillx"))
-  private val groups: Map<InlayGroup, List<InlayProviderSettingsModel>>
+  private val groups: MutableMap<InlayGroup, List<InlayProviderSettingsModel>>
   private var currentEditor: Editor? = null
+
+  companion object {
+    @kotlin.jvm.JvmField
+    val PREVIEW_KEY = Key.create<Any>("inlay.preview.key")
+  }
 
   init {
     val models = InlaySettingsProvider.EP.getExtensions().flatMap { provider ->
       provider.getSupportedLanguages(project).flatMap { provider.createModels(project, it) }
     }
     groups = models.groupBy { it.group }.toSortedMap()
+    val globalSettings = groups.keys.associateWith { InlayGroupSettingProvider.EP.findForGroup(it) }
 
     val root = CheckedTreeNode()
     val lastSelected = InlayHintsSettings.instance().getLastViewedProviderId()
     var nodeToSelect: CheckedTreeNode? = null
+
+    // filling code vision settings
+    if (Registry.`is`("editor.codeVision.new")) {
+      groups.remove(InlayGroup.CODE_VISION_GROUP)
+    }
+
     for (group in groups) {
-      val groupNode = CheckedTreeNode(group.key)
+      val groupNode = CheckedTreeNode(globalSettings[group.key] ?: group.key)
       root.add(groupNode)
-      for (lang in group.value.groupBy { it.language }) {
+      val primaryLanguages = IdeLanguageCustomization.getInstance().primaryIdeLanguages
+      val sortedMap = group.value.groupBy { it.language }.toSortedMap(
+        Comparator { o1, o2 -> val primary = compareValues(primaryLanguages.contains(o2), primaryLanguages.contains(o1))
+          if (primary != 0) primary
+          else compareValues(o1.displayName, o2.displayName)
+        })
+      for (lang in sortedMap) {
         val firstModel = lang.value.first()
         val langNode: CheckedTreeNode
         val startFrom: Int
-        if ((lang.value.size == 1 || group.key.toString() == firstModel.name) && InlayGroup.OTHER_GROUP != group.key) {
+        if ((lang.value.size == 1 || group.key.toString() == firstModel.name && firstModel.language == sortedMap.firstKey()) &&
+            InlayGroup.OTHER_GROUP != group.key) {
           nodeToSelect = addModelNode(firstModel, groupNode, lastSelected, nodeToSelect)
           firstModel.isMergedNode = true
           langNode = groupNode.firstChild as CheckedTreeNode
           startFrom = 1
         }
-        else {
+        else if(lang.key == Language.ANY){
+          langNode = groupNode
+          startFrom = 0
+        }
+        else{
           langNode = CheckedTreeNode(lang.key)
           groupNode.add(langNode)
           startFrom = 0
@@ -102,7 +130,7 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
       TreeUtil.selectNode(tree, nodeToSelect)
     }
 
-    val splitter = JBSplitter(false, "inlay.settings.proportion.key", 0.5f)
+    val splitter = JBSplitter(false, "inlay.settings.proportion.key", 0.45f)
     splitter.setHonorComponentsMinimumSize(false)
     splitter.firstComponent = ScrollPaneFactory.createScrollPane(tree, ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED, ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER)
     splitter.secondComponent = rightPanel
@@ -112,6 +140,7 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
   @Nls
   private fun getName(node: DefaultMutableTreeNode?, parent: DefaultMutableTreeNode?): String {
     when (val item = node?.userObject) {
+      is InlayGroupSettingProvider -> return item.group.toString()
       is InlayGroup -> return item.toString()
       is Language -> return item.displayName
       is InlayProviderSettingsModel -> return if (parent?.userObject is InlayGroup) item.language.displayName else item.name
@@ -158,14 +187,19 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
     rightPanel.removeAll()
     currentEditor = null
     when (val item = treeNode?.userObject) {
+      is InlayGroupSettingProvider -> {
+        rightPanel.add(item.component)
+      }
       is InlayProviderSettingsModel -> {
-        if (treeNode.isLeaf) {
+        if (item.description != null) {
           addDescription(item.description)
         }
-        item.component.border = JBUI.Borders.empty()
-        rightPanel.add(item.component)
+        if (!(item.component is JPanel) || item.component.componentCount > 0) {
+          item.component.border = JBUI.Borders.empty()
+          rightPanel.add(item.component)
+        }
         if (treeNode.isLeaf) {
-          addPreview(item.getCasePreview(null) ?: item.previewText, item)
+          addPreview(item.getCasePreview(null) ?: item.previewText, item, null)
         }
       }
       is ImmediateConfigurable.Case -> {
@@ -173,7 +207,7 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
         val model = parent.userObject as InlayProviderSettingsModel
         addDescription(model.getCaseDescription(item))
         val preview = model.getCasePreview(item)
-        addPreview(preview, model)
+        addPreview(preview, model, item)
       }
     }
     if (treeNode != null) {
@@ -183,10 +217,12 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
     rightPanel.repaint()
   }
 
-  private fun addPreview(previewText: String?, model: InlayProviderSettingsModel) {
+  private fun addPreview(previewText: String?, model: InlayProviderSettingsModel, case: ImmediateConfigurable.Case?) {
     if (previewText != null) {
-      val editorTextField = createEditor(model.language, project) { editor ->
+      val editorTextField = createEditor(model.getCasePreviewLanguage(null) ?: model.language, project) { editor ->
         currentEditor = editor
+        PREVIEW_KEY.set(editor, "")
+        CASE_KEY.set(editor, case)
         updateHints(editor, model)
       }
       editorTextField.text = previewText
@@ -204,15 +240,18 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
   }
 
   private fun updateHints(editor: Editor, model: InlayProviderSettingsModel) {
-    val fileType = model.language.associatedFileType ?: PlainTextFileType.INSTANCE
+    val fileType = model.getCasePreviewLanguage(null)?.associatedFileType ?: PlainTextFileType.INSTANCE
     ReadAction.nonBlocking(Callable {
-      model.createFile(project, fileType, editor.document)
+      val file = model.createFile(project, fileType, editor.document)
+      val continuation = model.collectData(editor, file)
+      continuation
     })
-      .finishOnUiThread(ModalityState.defaultModalityState()) { psiFile ->
+      .finishOnUiThread(ModalityState.stateForComponent(this)) { continuation ->
         ApplicationManager.getApplication().runWriteAction {
-          model.collectAndApply(editor, psiFile)
+          continuation.run()
         }
       }
+      .expireWhen { editor.isDisposed }
       .inSmartMode(project)
       .submit(AppExecutorUtil.getAppExecutorService())
   }
@@ -241,6 +280,10 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
 
   private fun reset(node: CheckedTreeNode, settings: InlayHintsSettings) {
     when (val item = node.userObject) {
+      is InlayGroupSettingProvider -> {
+        item.reset()
+        node.isChecked = item.isEnabled
+      }
       is InlayProviderSettingsModel -> {
         item.reset()
         resetNode(node, isModelEnabled(item, settings))
@@ -288,6 +331,10 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
   private fun apply(node: CheckedTreeNode, settings: InlayHintsSettings) {
     node.children().toList().forEach { apply(it as CheckedTreeNode, settings) }
     when (val item = node.userObject) {
+      is InlayGroupSettingProvider -> {
+        item.isEnabled = node.isChecked
+        item.apply()
+      }
       is InlayProviderSettingsModel -> {
         item.isEnabled = node.isChecked
         item.apply()
@@ -319,6 +366,10 @@ class InlaySettingsPanel(val project: Project): JPanel(BorderLayout()) {
 
   private fun isModified(node: CheckedTreeNode, settings: InlayHintsSettings): Boolean {
     when (val item = node.userObject) {
+      is InlayGroupSettingProvider -> {
+        if(item.isModified())
+          return true
+      }
       is InlayProviderSettingsModel -> {
         if (item.isModified() || (node.isChecked != isModelEnabled(item, settings)))
           return true

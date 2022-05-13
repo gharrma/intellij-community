@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.ui;
 
 import com.intellij.ide.IdeBundle;
@@ -17,6 +17,7 @@ import com.intellij.openapi.application.ex.ApplicationInfoEx;
 import com.intellij.openapi.extensions.PluginId;
 import com.intellij.openapi.project.DumbAwareAction;
 import com.intellij.openapi.ui.popup.Balloon;
+import com.intellij.openapi.updateSettings.impl.UpdateChecker;
 import com.intellij.openapi.util.Condition;
 import com.intellij.util.containers.ContainerUtil;
 import org.jetbrains.annotations.Nls;
@@ -87,9 +88,9 @@ public final class PluginBooleanOptionDescriptor extends BooleanOptionDescriptio
                                                  @NotNull @Nls String content,
                                                  boolean enabled) {
     String title = IdeBundle.message(enabled ? "plugins.auto.enabled.notification.title" : "plugins.auto.disabled.notification.title");
-    Notification switchNotification = NotificationGroupManager.getInstance()
-      .getNotificationGroup("Plugins AutoSwitch")
+    Notification switchNotification = UpdateChecker.getNotificationGroupForPluginUpdateResults()
       .createNotification(content, NotificationType.INFORMATION)
+      .setDisplayId("plugin.auto.switch")
       .setTitle(title)
       .addAction(new NotificationAction(IdeBundle.message("plugins.auto.switch.action.name")) {
         @Override
@@ -135,14 +136,16 @@ public final class PluginBooleanOptionDescriptor extends BooleanOptionDescriptio
     for (IdeaPluginDescriptor descriptor : descriptors) {
       result.add(descriptor);
 
-      if (descriptor instanceof IdeaPluginDescriptorImpl) {
-        PluginManagerCore.processAllNonOptionalDependencies((IdeaPluginDescriptorImpl)descriptor, pluginIdMap, dependency ->
-          PluginManagerCore.CORE_ID.equals(dependency.getPluginId()) ||
-          dependency.isEnabled() ||
-          !result.add(dependency) ?
-          FileVisitResult.SKIP_SUBTREE /* if descriptor has already been added/enabled, no need to process it's dependencies */ :
-          FileVisitResult.CONTINUE);
+      if (!(descriptor instanceof IdeaPluginDescriptorImpl)) {
+        continue;
       }
+
+      PluginManagerCore.processAllNonOptionalDependencies((IdeaPluginDescriptorImpl)descriptor, pluginIdMap, dependency ->
+        PluginManagerCore.CORE_ID.equals(dependency.getPluginId()) ||
+        dependency.isEnabled() ||
+        !result.add(dependency) ?
+        FileVisitResult.SKIP_SUBTREE /* if descriptor has already been added/enabled, no need to process it's dependencies */ :
+        FileVisitResult.CONTINUE);
     }
 
     return Collections.unmodifiableSet(result);
@@ -156,9 +159,7 @@ public final class PluginBooleanOptionDescriptor extends BooleanOptionDescriptio
     for (IdeaPluginDescriptor descriptor : descriptors) {
       result.add(descriptor);
 
-      result.addAll(MyPluginModel.getDependents(descriptor,
-                                                pluginIdMap,
-                                                applicationInfo));
+      result.addAll(MyPluginModel.getDependents(descriptor, applicationInfo, pluginIdMap));
     }
 
     return Collections.unmodifiableSet(result);
@@ -170,21 +171,19 @@ public final class PluginBooleanOptionDescriptor extends BooleanOptionDescriptio
     }
 
     Notification notification = ourPreviousNotification.get();
-    if (notification == null) {
-      return;
+    if (notification != null) {
+      Balloon balloon = notification.getBalloon();
+      if (balloon != null && !balloon.isDisposed()) {
+        return;
+      }
     }
 
-    Balloon balloon = notification.getBalloon();
-    if (balloon != null && !balloon.isDisposed()) {
-      return;
-    }
-
-    Notification newNotification = NotificationGroupManager.getInstance()
-      .getNotificationGroup("Plugins updates")
+    Notification newNotification = UpdateChecker.getNotificationGroupForIdeUpdateResults()
       .createNotification(
         IdeBundle.message("plugins.changed.notification.content", ApplicationNamesInfo.getInstance().getFullProductName()),
         NotificationType.INFORMATION)
       .setTitle(IdeBundle.message("plugins.changed.notification.title"))
+      .setDisplayId("plugins.updated.restart.required")
       .addAction(new DumbAwareAction(IdeBundle.message("ide.restart.action")) {
         @Override
         public void actionPerformed(@NotNull AnActionEvent e) {

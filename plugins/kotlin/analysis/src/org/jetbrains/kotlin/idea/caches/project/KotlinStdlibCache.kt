@@ -11,9 +11,11 @@ import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.OrderRootType
 import com.intellij.openapi.roots.ProjectFileIndex
 import com.intellij.openapi.roots.impl.libraries.LibraryEx
+import com.intellij.openapi.util.ThrowableComputable
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.psi.search.DelegatingGlobalSearchScope
 import com.intellij.psi.search.GlobalSearchScope
+import com.intellij.util.indexing.DumbModeAccessType
 import com.intellij.util.indexing.FileBasedIndex
 import org.jetbrains.kotlin.caches.project.cacheInvalidatingOnRootModifications
 import org.jetbrains.kotlin.idea.configuration.IdeBuiltInsLoadingState
@@ -82,11 +84,13 @@ class KotlinStdlibCacheImpl(val project: Project) : KotlinStdlibCache {
 
     private fun libraryScopeContainsIndexedFilesForNames(libraryInfo: LibraryInfo, names: Collection<FqName>): Boolean =
         names.any { name ->
-            FileBasedIndex.getInstance().getContainingFiles(
-                KotlinStdlibIndex.KEY,
-                name,
-                LibraryScope(project, libraryInfo.library.rootProvider.getFiles(OrderRootType.CLASSES).toSet())
-            ).isNotEmpty()
+            DumbModeAccessType.RELIABLE_DATA_ONLY.ignoreDumbMode(ThrowableComputable {
+                FileBasedIndex.getInstance().getContainingFiles(
+                    KotlinStdlibIndex.KEY,
+                    name,
+                    LibraryScope(project, libraryInfo.library.rootProvider.getFiles(OrderRootType.CLASSES).toSet())
+                ).isNotEmpty()
+            })
         }
 
     private fun libraryScopeContainsIndexedFilesForName(libraryInfo: LibraryInfo, name: FqName) =
@@ -114,19 +118,18 @@ class KotlinStdlibCacheImpl(val project: Project) : KotlinStdlibCache {
 
     override fun findStdlibInModuleDependencies(module: IdeaModuleInfo): LibraryInfo? {
         ProgressManager.checkCanceled()
-        var moduleSourceInfo: ModuleSourceInfo? = null
         val stdlibDependency = moduleStdlibDependencyCache.getOrPut(module) {
-
-            moduleSourceInfo = module.safeAs<ModuleSourceInfo>()
+            val moduleSourceInfo = module.safeAs<ModuleSourceInfo>()
             val stdLib = moduleSourceInfo?.module?.moduleWithLibrariesScope?.let index@{ scope ->
-                val filesWithinStdlib = FileBasedIndex.getInstance().getContainingFiles(
-                    KotlinStdlibIndex.KEY,
-                    KotlinStdlibIndex.KOTLIN_STDLIB_NAME,
-                    scope
-                )
+                val stdlibManifests =
+                    FileBasedIndex.getInstance().getContainingFiles(
+                        KotlinStdlibIndex.KEY,
+                        KotlinStdlibIndex.KOTLIN_STDLIB_NAME,
+                        scope
+                    )
                 val index = ProjectFileIndex.SERVICE.getInstance(project)
-                for (file in filesWithinStdlib) {
-                    val orderEntries = index.getOrderEntriesForFile(file)
+                for (manifest in stdlibManifests) {
+                    val orderEntries = index.getOrderEntriesForFile(manifest)
                     orderEntries.firstNotNullOfOrNull { it.safeAs<LibraryOrderEntry>()?.library.safeAs<LibraryEx>() }?.let {
                         createLibraryInfo(project, it)
                     }?.firstOrNull(::isStdlib)?.let {
@@ -137,8 +140,8 @@ class KotlinStdlibCacheImpl(val project: Project) : KotlinStdlibCache {
             } ?: module.safeAs<LibraryInfo>()?.takeIf(::isStdlib) ?: module.dependencies().firstOrNull {
                 it is LibraryInfo && isStdlib(it)
             } as LibraryInfo?
+
             val stdlibDependency = StdlibDependency(stdLib)
-            // if stdlib is created (i.e. is not fetched from a cache) for a module source info
             moduleSourceInfo?.let { _ ->
                 // all module dependencies have same stdlib as module itself
                 module.dependencies().forEach {

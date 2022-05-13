@@ -1,6 +1,6 @@
 // FILE: test.before.kt
 // "Replace scope function with safe (?.) call" "true"
-// WITH_RUNTIME
+// WITH_STDLIB
 package p;
 
 fun test(x: Foo) {
@@ -34,7 +34,7 @@ public class Foo {
 
 // FILE: test.after.kt
 // "Replace scope function with safe (?.) call" "true"
-// WITH_RUNTIME
+// WITH_STDLIB
 package p;
 
 fun test(x: Foo) {

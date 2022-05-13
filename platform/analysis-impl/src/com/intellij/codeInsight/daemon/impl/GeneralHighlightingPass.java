@@ -70,16 +70,15 @@ public class GeneralHighlightingPass extends ProgressableTextEditorHighlightingP
   final EditorColorsScheme myGlobalScheme;
   private volatile NotNullProducer<HighlightVisitor[]> myHighlightVisitorProducer = this::cloneHighlightVisitors;
 
-  public GeneralHighlightingPass(@NotNull Project project,
-                                 @NotNull PsiFile file,
-                                 @NotNull Document document,
-                                 int startOffset,
-                                 int endOffset,
-                                 boolean updateAll,
-                                 @NotNull ProperTextRange priorityRange,
-                                 @Nullable Editor editor,
-                                 @NotNull HighlightInfoProcessor highlightInfoProcessor) {
-    super(project, document, getPresentableNameText(), file, editor, TextRange.create(startOffset, endOffset), true, highlightInfoProcessor);
+  GeneralHighlightingPass(@NotNull PsiFile file,
+                          @NotNull Document document,
+                          int startOffset,
+                          int endOffset,
+                          boolean updateAll,
+                          @NotNull ProperTextRange priorityRange,
+                          @Nullable Editor editor,
+                          @NotNull HighlightInfoProcessor highlightInfoProcessor) {
+    super(file.getProject(), document, getPresentableNameText(), file, editor, TextRange.create(startOffset, endOffset), true, highlightInfoProcessor);
     myUpdateAll = updateAll;
     myPriorityRange = priorityRange;
 
@@ -389,7 +388,7 @@ public class GeneralHighlightingPass extends ProgressableTextEditorHighlightingP
 
       // include infos which we got while visiting nested elements with the same range
       while (true) {
-        if (!nestedRange.empty() && Divider.contains(elementRange, nestedRange.peek())) {
+        if (!nestedRange.empty() && TextRange.contains(elementRange, nestedRange.peek())) {
           long oldRange = nestedRange.pop();
           List<HighlightInfo> oldInfos = nestedInfos.pop();
           if (elementRange == oldRange) {

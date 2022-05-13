@@ -5,6 +5,7 @@ import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.ShutDownTracker;
+import com.intellij.openapi.vfs.newvfs.persistent.FSRecords;
 import com.intellij.testFramework.JUnit38AssumeSupportRunner;
 import com.intellij.testFramework.LightPlatformTestCase;
 import com.intellij.testFramework.TestApplicationManagerKt;
@@ -73,7 +74,6 @@ public class _LastInSuiteTest extends TestCase {
     Collection<Language> languages = Language.getRegisteredLanguages();
     Map<String, Language> displayNames = new HashMap<>();
     for (Language language : languages) {
-      System.out.println(language);
       Language prev = displayNames.put(language.getDisplayName(), language);
       if (prev != null) {
         fail(prev + " ("+prev.getClass()+") and " + language +" ("+language.getClass()+") both have identical display name: "+language.getDisplayName());
@@ -88,5 +88,9 @@ public class _LastInSuiteTest extends TestCase {
       System.out.printf("##teamcity[buildStatisticValue key='ideaTests.totalTimeMs' value='%d']%n", testSuiteDuration / 1000000);
     }
     LightPlatformTestCase.reportTestExecutionStatistics();
+  }
+
+  public void testFilenameIndexConsistency() {
+    FSRecords.checkFilenameIndexConsistency();
   }
 }

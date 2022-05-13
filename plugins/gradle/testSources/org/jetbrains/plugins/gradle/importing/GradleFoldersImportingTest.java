@@ -260,6 +260,28 @@ public class GradleFoldersImportingTest extends GradleImportingTestCase {
 
   @Test
   @TargetVersions("4.7+")
+  public void testResourceFoldersWithIdeaPluginInNonJavaProject() throws Exception {
+    createProjectSubDirs("python/src", "python/test", "python/resources");
+    importProject(createBuildScriptBuilder().withIdeaPlugin()
+                    .addPostfix(      "idea {",
+                                      "  module {",
+                                      "    sourceDirs += file('python/src')",
+                                      "    resourceDirs += file('python/resources')",
+                                      "    testSourceDirs += file('python/test')",
+                                      "  }",
+                                      "}")
+                    .generate());
+
+    assertModules("project");
+    assertContentRoots("project", getProjectPath());
+
+    assertSources("project", "python/src");
+    assertResources("project", "python/resources");
+    assertTestSources("project", "python/test");
+  }
+
+  @Test
+  @TargetVersions("4.7+")
   public void testResourceFoldersWithIdeaPlugin() throws Exception {
     createProjectSubDirs("src/main/java",
                          "src/main/src2",
@@ -797,6 +819,38 @@ public class GradleFoldersImportingTest extends GradleImportingTestCase {
     assertContentRoots("project", getProjectPath());
     assertExcludes("project", "build");
     assertExcludePatterns("project", getExternalSystemConfigFileName());
+  }
+
+  @Test
+  @TargetVersions("7.4+")
+  public void testJvmTestSuitesImported() throws Exception {
+    createDefaultDirs();
+    createProjectSubFile("src/integrationTest/java/A.java", "class A {}");
+    createProjectSubFile("src/integrationTest/resources/file.txt", "test data");
+    final GradleBuildScriptBuilder buildScript = createBuildScriptBuilder()
+      .withPlugin("java", null)
+      .withPlugin("jvm-test-suite", null)
+      .addPostfix(
+        "testing {",
+        "    suites { ",
+        "        test { ",
+        "            useJUnitJupiter() ",
+        "        }",
+        "        integrationTest(JvmTestSuite) { ",
+        "            dependencies {",
+        "                implementation project ",
+        "            }",
+        "        }",
+        "    }",
+        "}"
+      );
+
+    importProject(buildScript.generate());
+    assertDefaultGradleJavaProjectFolders("project");
+    final String testSourceSetModuleName = "project.integrationTest";
+    assertContentRoots(testSourceSetModuleName, getProjectPath() + "/src/integrationTest");
+    assertTestSources(testSourceSetModuleName, "java");
+    assertTestResources(testSourceSetModuleName, "resources");
   }
 
   protected void assertDefaultGradleJavaProjectFolders(@NotNull String mainModuleName) {

@@ -81,8 +81,7 @@ class KotlinCacheServiceImpl(val project: Project) : KotlinCacheService {
             // Scripts support seem to modify some of the important aspects via file user data without triggering PsiModificationTracker.
             // If in doubt, run ScriptDefinitionsOrderTestGenerated
             return getFacadeToAnalyzeFile(file, TargetPlatformDetector.getPlatform(file))
-        }
-        else {
+        } else {
             return CachedValuesManager.getCachedValue(file) {
                 CachedValueProvider.Result(
                     getFacadeToAnalyzeFile(file, TargetPlatformDetector.getPlatform(file)),

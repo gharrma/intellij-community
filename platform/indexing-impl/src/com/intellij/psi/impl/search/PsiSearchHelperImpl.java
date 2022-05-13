@@ -82,7 +82,9 @@ public class PsiSearchHelperImpl implements PsiSearchHelper {
   }
 
   private static @NotNull SearchScope getUseScope(@NotNull PsiElement element, boolean restrictToCodeUsageScope) {
-    SearchScope scope = element.getUseScope();
+    SearchScope scope = PsiSearchScopeUtil.USE_SCOPE_KEY.get(element.getContainingFile());
+    if (scope != null) return scope;
+    scope = element.getUseScope();
     for (UseScopeEnlarger enlarger : UseScopeEnlarger.EP_NAME.getExtensions()) {
       ProgressManager.checkCanceled();
       SearchScope additionalScope = enlarger.getAdditionalUseScope(element);
@@ -388,8 +390,7 @@ public class PsiSearchHelperImpl implements PsiSearchHelper {
                                       int alreadyProcessedFiles,
                                       @NotNull ProgressIndicator progress,
                                       @NotNull Processor<? super PsiFile> localProcessor) {
-    myManager.startBatchFilesProcessingMode();
-    try {
+    return myManager.runInBatchFilesMode(() -> {
       AtomicInteger counter = new AtomicInteger(alreadyProcessedFiles);
       AtomicBoolean stopped = new AtomicBoolean(false);
       ProgressIndicator originalIndicator = ProgressWrapper.unwrapAll(progress);
@@ -411,10 +412,7 @@ public class PsiSearchHelperImpl implements PsiSearchHelper {
         }
         return !stopped.get();
       });
-    }
-    finally {
-      myManager.finishBatchFilesProcessingMode();
-    }
+    });
   }
 
   // Tries to run {@code localProcessor} for each file in {@code files} concurrently on ForkJoinPool.
@@ -1266,9 +1264,12 @@ public class PsiSearchHelperImpl implements PsiSearchHelper {
         return Collections.singletonList(idIndexQuery);
       }
 
+      if (IdIndexEntry.useStrongerHash()) {
+        return Collections.singletonList(idIndexQuery);
+      }
+
       FileBasedIndex.AllKeysQuery<Integer, Void> trigramIndexQuery =
         new FileBasedIndex.AllKeysQuery<>(TrigramIndex.INDEX_ID, myTrigrams, null);
-
       return Arrays.asList(idIndexQuery, trigramIndexQuery);
     }
 

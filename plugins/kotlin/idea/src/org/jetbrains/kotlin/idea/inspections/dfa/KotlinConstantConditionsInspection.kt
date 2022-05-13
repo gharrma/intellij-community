@@ -29,6 +29,7 @@ import org.jetbrains.kotlin.idea.caches.resolve.resolveToCall
 import org.jetbrains.kotlin.idea.inspections.AbstractKotlinInspection
 import org.jetbrains.kotlin.idea.inspections.dfa.KotlinAnchor.*
 import org.jetbrains.kotlin.idea.inspections.dfa.KotlinProblem.*
+import org.jetbrains.kotlin.idea.intentions.loopToCallChain.isConstant
 import org.jetbrains.kotlin.idea.intentions.negate
 import org.jetbrains.kotlin.idea.project.platform
 import org.jetbrains.kotlin.idea.references.mainReference
@@ -410,9 +411,10 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
                         }
                     }
                     is KotlinForVisitedAnchor -> {
-                        if (cv == ConstantValue.FALSE) {
+                        val loopRange = anchor.forExpression.loopRange!!
+                        if (cv == ConstantValue.FALSE && !shouldSuppressForCondition(loopRange)) {
                             val message = KotlinBundle.message("inspection.message.for.never.visited")
-                            holder.registerProblem(anchor.forExpression.loopRange!!, message)
+                            holder.registerProblem(loopRange, message)
                         }
                     }
                 }
@@ -440,6 +442,16 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
         }
     }
 
+    private fun shouldSuppressForCondition(loopRange: KtExpression): Boolean {
+        if (loopRange is KtBinaryExpression) {
+            val left = loopRange.left
+            val right = loopRange.right
+            // Reported separately by EmptyRangeInspection
+            return left != null && right != null && left.isConstant() && right.isConstant()
+        }
+        return false
+    }
+
     private fun shouldReportAsValue(expr: KtExpression) =
         expr is KtSimpleNameExpression || expr is KtQualifiedExpression && expr.selectorExpression is KtSimpleNameExpression
 
@@ -457,7 +469,7 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
         return false
     }
 
-    private fun isCompilationWarning(anchor: KtExpression): Boolean
+    private fun isCompilationWarning(anchor: KtElement): Boolean
     {
         val context = anchor.analyze(BodyResolveMode.FULL)
         if (context.diagnostics.forElement(anchor).any
@@ -485,9 +497,8 @@ class KotlinConstantConditionsInspection : AbstractKotlinInspection() {
     ): Boolean {
         if (cv != ConstantValue.FALSE && cv != ConstantValue.TRUE) return true
         if (cv == ConstantValue.TRUE && isLastCondition(condition)) return true
-        val context = condition.analyze(BodyResolveMode.FULL)
-        if (context.diagnostics.forElement(condition).any { it.factory == Errors.USELESS_IS_CHECK }) return true
-        return false
+        if (condition.textLength == 0) return true
+        return isCompilationWarning(condition)
     }
 
     private fun isLastCondition(condition: KtWhenCondition): Boolean {

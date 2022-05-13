@@ -3,9 +3,7 @@ package com.intellij.util.indexing
 
 import com.intellij.find.ngrams.TrigramIndex
 import com.intellij.ide.highlighter.JavaFileType
-import com.intellij.ide.plugins.DynamicPluginsTestUtil
 import com.intellij.ide.scratch.ScratchRootType
-import com.intellij.ide.startup.ServiceNotReadyException
 import com.intellij.ide.todo.TodoConfiguration
 import com.intellij.java.index.StringIndex
 import com.intellij.lang.Language
@@ -33,7 +31,6 @@ import com.intellij.openapi.progress.util.ProgressIndicatorBase
 import com.intellij.openapi.project.DumbService
 import com.intellij.openapi.project.DumbServiceImpl
 import com.intellij.openapi.roots.ContentIterator
-import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.RecursionManager
 import com.intellij.openapi.util.Ref
 import com.intellij.openapi.util.ThrowableComputable
@@ -54,7 +51,6 @@ import com.intellij.psi.impl.PsiManagerEx
 import com.intellij.psi.impl.cache.impl.id.IdIndex
 import com.intellij.psi.impl.cache.impl.id.IdIndexEntry
 import com.intellij.psi.impl.cache.impl.id.IdIndexImpl
-import com.intellij.psi.impl.cache.impl.todo.TodoIndex
 import com.intellij.psi.impl.file.impl.FileManagerImpl
 import com.intellij.psi.impl.java.JavaFunctionalExpressionIndex
 import com.intellij.psi.impl.java.stubs.index.JavaStubIndexKeys
@@ -82,16 +78,12 @@ import com.intellij.util.indexing.impl.UpdatableValueContainer
 import com.intellij.util.indexing.impl.forward.IntForwardIndex
 import com.intellij.util.indexing.impl.storage.VfsAwareMapIndexStorage
 import com.intellij.util.indexing.impl.storage.VfsAwareMapReduceIndex
-import com.intellij.util.indexing.roots.IndexableEntityProviderMethods
-import com.intellij.util.indexing.roots.IndexableFilesIterator
 import com.intellij.util.io.CaseInsensitiveEnumeratorStringDescriptor
 import com.intellij.util.io.EnumeratorStringDescriptor
 import com.intellij.util.io.PersistentMapBase
 import com.intellij.util.ref.GCUtil
 import com.intellij.util.ref.GCWatcher
 import com.intellij.util.ui.UIUtil
-import com.intellij.workspaceModel.ide.WorkspaceModel
-import com.intellij.workspaceModel.storage.bridgeEntities.ModuleEntity
 import com.siyeh.ig.JavaOverridingMethodUtil
 import groovy.transform.CompileStatic
 import org.jetbrains.annotations.NotNull
@@ -109,7 +101,10 @@ class IndexTest extends JavaCodeInsightFixtureTestCase {
       // should add file to test dire as soon as possible
       String otherRoot = myFixture.getTempDirPath() + "/otherRoot"
       assertTrue(new File(otherRoot).mkdirs())
-      assertTrue(new File(otherRoot, "intellij.exe").createNewFile())
+
+      def exe = new File(otherRoot, "intellij.exe")
+      assertTrue(exe.createNewFile())
+      FileUtil.writeToFile(exe, new byte[]{1,2,3,22}) // convince IDEA it's binary
       moduleBuilder.addSourceContentRoot(otherRoot)
     }
   }
@@ -670,7 +665,6 @@ class IndexTest extends JavaCodeInsightFixtureTestCase {
   private void runFindClassStubIndexQueryThatProducesInvalidResult(String qName) {
     def foundFile = [null]
 
-    def key = qName.hashCode()
     def searchScope = GlobalSearchScope.allScope(project)
     def processor = new Processor<PsiFile>() {
       @Override
@@ -683,10 +677,10 @@ class IndexTest extends JavaCodeInsightFixtureTestCase {
     try {
 
       StubIndex.instance.
-        processElements(JavaStubIndexKeys.CLASS_FQN, key, project, searchScope, PsiClass.class, new Processor<PsiClass>() {
+        processElements(JavaStubIndexKeys.CLASS_FQN, qName, project, searchScope, PsiClass.class, new Processor<PsiClass>() {
           @Override
           boolean process(PsiClass aClass) {
-            StubIndex.instance.processElements(JavaStubIndexKeys.CLASS_FQN, key, project, searchScope, PsiFile.class, processor)
+            StubIndex.instance.processElements(JavaStubIndexKeys.CLASS_FQN, qName, project, searchScope, PsiFile.class, processor)
 
             return false
           }
@@ -700,7 +694,7 @@ class IndexTest extends JavaCodeInsightFixtureTestCase {
     assertTrue(((StubIndexImpl)StubIndex.instance).areAllProblemsProcessedInTheCurrentThread())
 
     try {
-      StubIndex.instance.processElements(JavaStubIndexKeys.CLASS_FQN, key, project, searchScope, PsiFile.class, processor)
+      StubIndex.instance.processElements(JavaStubIndexKeys.CLASS_FQN, qName, project, searchScope, PsiFile.class, processor)
 
       fail("Unexpected")
     }
@@ -1040,7 +1034,7 @@ class IndexTest extends JavaCodeInsightFixtureTestCase {
     TodoPattern[] newPatterns = [pattern]
     TodoConfiguration.getInstance().setTodoPatterns(newPatterns)
     PlatformTestUtil.dispatchAllEventsInIdeEventQueue()
-    FileBasedIndex.instance.ensureUpToDate(TodoIndex.NAME, project, GlobalSearchScope.allScope(project))
+    FileBasedIndex.instance.ensureUpToDate(IdIndex.NAME, project, GlobalSearchScope.allScope(project))
     myFixture.addFileToProject("Foo.txt", "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
 
     try {
@@ -1058,7 +1052,7 @@ class IndexTest extends JavaCodeInsightFixtureTestCase {
         {
           try {
             progressStarted.countDown()
-            FileBasedIndex.instance.ensureUpToDate(TodoIndex.NAME, project, GlobalSearchScope.allScope(project))
+            FileBasedIndex.instance.ensureUpToDate(IdIndex.NAME, project, GlobalSearchScope.allScope(project))
           }
           catch (ProcessCanceledException ignore) {
             canceled[0] = true
@@ -1152,15 +1146,14 @@ class IndexTest extends JavaCodeInsightFixtureTestCase {
 
   void "test indexed state for file without content requiring indices"() {
     def scope = GlobalSearchScope.allScope(getProject())
-    FileBasedIndex.instance.ensureUpToDate(FilenameIndex.NAME, project, scope)
+    FileBasedIndex.instance.ensureUpToDate(FileTypeIndex.NAME, project, scope)
 
     def files = FilenameIndex.getFilesByName(getProject(), "intellij.exe", scope)
     def file = assertOneElement(files).virtualFile
-    assertTrue(file.getFileType().isBinary())
     assertTrue(((VirtualFileSystemEntry)file).isFileIndexed())
 
     WriteCommandAction.runWriteCommandAction(getProject(), { file.rename(this, 'intellij2.exe') })
-    FileBasedIndex.instance.ensureUpToDate(FilenameIndex.NAME, project, scope)
+    FileBasedIndex.instance.ensureUpToDate(FileTypeIndex.NAME, project, scope)
     assertTrue(((VirtualFileSystemEntry)file).isFileIndexed())
   }
 

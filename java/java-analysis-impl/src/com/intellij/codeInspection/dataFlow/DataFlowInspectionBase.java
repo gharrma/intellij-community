@@ -164,24 +164,11 @@ public abstract class DataFlowInspectionBase extends AbstractBaseJavaLocalInspec
       }
 
       @Override
-      public void visitWhileStatement(PsiWhileStatement statement) {
-        checkLoopCondition(statement.getCondition());
-      }
-
-      @Override
       public void visitDoWhileStatement(PsiDoWhileStatement statement) {
-        checkLoopCondition(statement.getCondition());
-      }
-
-      @Override
-      public void visitForStatement(PsiForStatement statement) {
-        checkLoopCondition(statement.getCondition());
-      }
-
-      private void checkLoopCondition(PsiExpression condition) {
-        condition = PsiUtil.skipParenthesizedExprDown(condition);
+        PsiExpression condition = PsiUtil.skipParenthesizedExprDown(statement.getCondition());
         if (condition != null && condition.textMatches(PsiKeyword.FALSE)) {
-          holder.registerProblem(condition, JavaAnalysisBundle.message("dataflow.message.constant.no.ref", 0), createSimplifyBooleanExpressionFix(condition, false));
+          holder.registerProblem(condition, JavaAnalysisBundle.message("dataflow.message.constant.no.ref", 0),
+                                 createSimplifyBooleanExpressionFix(condition, false));
         }
       }
     };
@@ -278,7 +265,7 @@ public abstract class DataFlowInspectionBase extends AbstractBaseJavaLocalInspec
 
   private void createDescription(ProblemsHolder holder,
                                  final DataFlowInstructionVisitor visitor,
-                                 PsiElement scope, 
+                                 PsiElement scope,
                                  Instruction @NotNull [] instructions) {
     ProblemReporter reporter = new ProblemReporter(holder, scope);
 
@@ -340,8 +327,9 @@ public abstract class DataFlowInspectionBase extends AbstractBaseJavaLocalInspec
       if (entry.getValue() != ThreeState.YES) continue;
       PsiCaseLabelElement label = entry.getKey();
       PsiSwitchLabelStatementBase labelStatement = Objects.requireNonNull(PsiImplUtil.getSwitchLabel(label));
-      PsiSwitchBlock statement = labelStatement.getEnclosingSwitchBlock();
-      if (statement == null || !canRemoveUnreachableBranches(labelStatement, statement)) continue;
+      PsiSwitchBlock switchBlock = labelStatement.getEnclosingSwitchBlock();
+      if (switchBlock == null || !canRemoveUnreachableBranches(labelStatement, switchBlock)) continue;
+      if (!canRemoveTheOnlyReachableLabel(label, switchBlock)) continue;
       if (!StreamEx.iterate(labelStatement, Objects::nonNull, l -> PsiTreeUtil.getPrevSiblingOfType(l, PsiSwitchLabelStatementBase.class))
         .skip(1).map(PsiSwitchLabelStatementBase::getCaseLabelElementList)
         .nonNull().flatArray(PsiCaseLabelElementList::getElements)
@@ -349,18 +337,26 @@ public abstract class DataFlowInspectionBase extends AbstractBaseJavaLocalInspec
         .allMatch(l -> labelReachability.get(l) == ThreeState.NO)) {
         continue;
       }
-      coveredSwitches.add(statement);
-      holder.registerProblem(label, JavaAnalysisBundle.message("dataflow.message.only.switch.label"),
-                             createUnwrapSwitchLabelFix());
+      coveredSwitches.add(switchBlock);
+      LocalQuickFix unwrapFix;
+      if (switchBlock instanceof PsiSwitchExpression && !CodeBlockSurrounder.canSurround(((PsiSwitchExpression)switchBlock))) {
+        unwrapFix = null;
+      }
+      else {
+        unwrapFix = createUnwrapSwitchLabelFix();
+      }
+      holder.registerProblem(label, JavaAnalysisBundle.message("dataflow.message.only.switch.label"), unwrapFix);
     }
-    PsiSwitchBlock switchBlock = PsiTreeUtil.getParentOfType(labelReachability.keySet().iterator().next(), PsiSwitchBlock.class);
-    Set<PsiElement> suspiciousElements = SwitchBlockHighlightingModel.findSuspiciousLabelElements(switchBlock);
+
     for (Map.Entry<PsiCaseLabelElement, ThreeState> entry : labelReachability.entrySet()) {
       if (entry.getValue() != ThreeState.NO) continue;
       PsiCaseLabelElement label = entry.getKey();
       PsiSwitchLabelStatementBase labelStatement = Objects.requireNonNull(PsiImplUtil.getSwitchLabel(label));
+      PsiSwitchBlock switchBlock = labelStatement.getEnclosingSwitchBlock();
+      if (switchBlock == null || coveredSwitches.contains(switchBlock)) continue;
       // duplicate case label is a compilation error so no need to highlight by the inspection
-      if (!coveredSwitches.contains(labelStatement.getEnclosingSwitchBlock()) && !suspiciousElements.contains(label)) {
+      Set<PsiElement> suspiciousElements = SwitchBlockHighlightingModel.findSuspiciousLabelElements(switchBlock);
+      if (!suspiciousElements.contains(label)) {
         holder.registerProblem(label, JavaAnalysisBundle.message("dataflow.message.unreachable.switch.label"),
                                new DeleteSwitchLabelFix(label));
       }
@@ -380,6 +376,18 @@ public abstract class DataFlowInspectionBase extends AbstractBaseJavaLocalInspec
            !ContainerUtil.and(allBranches, branch -> branch == labelStatement || SwitchUtils.isDefaultLabel(branch))) ||
            (labelStatement instanceof PsiSwitchLabeledRuleStatement &&
             ((PsiSwitchLabeledRuleStatement)labelStatement).getBody() instanceof PsiExpressionStatement);
+  }
+
+  private static boolean canRemoveTheOnlyReachableLabel(@NotNull PsiCaseLabelElement label, @NotNull PsiSwitchBlock switchBlock) {
+    if (!(label instanceof PsiPattern)) return true;
+    PsiExpression selector = switchBlock.getExpression();
+    if (selector == null) return false;
+    PsiType selectorType = selector.getType();
+    if (selectorType == null) return false;
+    if (!JavaPsiPatternUtil.isTotalForType(((PsiPattern)label), selectorType)) return true;
+    int branchCount = SwitchUtils.calculateBranchCount(switchBlock);
+    // it's a compilation error if switch contains both default and total pattern, so no additional suggestion is needed
+    return branchCount > 1;
   }
 
   private void reportConstants(ProblemReporter reporter, DataFlowInstructionVisitor visitor) {
@@ -654,7 +662,7 @@ public abstract class DataFlowInspectionBase extends AbstractBaseJavaLocalInspec
       NullabilityProblemKind.storingToNotNullArray.ifMyProblem(problem, reportNullability);
       if (SUGGEST_NULLABLE_ANNOTATIONS) {
         NullabilityProblemKind.passingToNonAnnotatedMethodRefParameter.ifMyProblem(
-          problem, methodRef -> reporter.registerProblem(methodRef, problem.getMessage(expressions)));
+          problem, methodRef -> reportNullableArgumentPassedToNonAnnotatedMethodRef(reporter, expressions, problem, methodRef));
         NullabilityProblemKind.passingToNonAnnotatedParameter.ifMyProblem(
           problem, top -> reportNullableArgumentsPassedToNonAnnotated(reporter, problem.getMessage(expressions), expression, top));
         NullabilityProblemKind.assigningToNonAnnotatedField.ifMyProblem(
@@ -764,6 +772,20 @@ public abstract class DataFlowInspectionBase extends AbstractBaseJavaLocalInspec
                                  DfaOptionalSupport.createReplaceOptionalOfNullableWithEmptyFix(anchor));
       }
     });
+  }
+
+  private static void reportNullableArgumentPassedToNonAnnotatedMethodRef(@NotNull ProblemReporter reporter,
+                                                                          @NotNull Map<PsiExpression, ConstantResult> expressions,
+                                                                          @NotNull NullabilityProblem<?> problem,
+                                                                          @NotNull PsiMethodReferenceExpression methodRef) {
+    PsiMethod target = tryCast(methodRef.resolve(), PsiMethod.class);
+    if (target == null) return;
+    PsiParameter[] parameters = target.getParameterList().getParameters();
+    if (parameters.length == 0) return;
+    PsiParameter parameter = parameters[0];
+    if (!BaseIntentionAction.canModify(parameter) || !AnnotationUtil.isAnnotatingApplicable(parameter)) return;
+    reporter.registerProblem(methodRef, problem.getMessage(expressions),
+                             parameters.length == 1 ? AddAnnotationPsiFix.createAddNullableFix(parameter) : null);
   }
 
   private void reportNullableArgumentsPassedToNonAnnotated(ProblemReporter reporter,

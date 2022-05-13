@@ -8,6 +8,7 @@ import com.intellij.execution.process.OSProcessHandler;
 import com.intellij.execution.process.ProcessAdapter;
 import com.intellij.execution.process.ProcessEvent;
 import com.intellij.execution.process.ProcessOutputTypes;
+import com.intellij.externalProcessAuthHelper.AuthenticationGate;
 import com.intellij.ide.impl.TrustedProjects;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.options.advanced.AdvancedSettings;
@@ -185,7 +186,8 @@ public class GitImpl extends GitImplBase {
     return runCommand(() -> {
       // do not use per-project executable for 'clone' command
       Project defaultProject = ProjectManager.getInstance().getDefaultProject();
-      GitLineHandler handler = new GitLineHandler(defaultProject, parentDirectory, GitCommand.CLONE);
+      GitExecutable executable = GitExecutableManager.getInstance().getExecutable(defaultProject, parentDirectory);
+      GitLineHandler handler = new GitLineHandler(defaultProject, parentDirectory, executable, GitCommand.CLONE, emptyList());
       handler.setSilent(false);
       handler.setStderrSuppressed(false);
       handler.setUrl(url);
@@ -605,7 +607,7 @@ public class GitImpl extends GitImplBase {
   public GitCommandResult fetch(@NotNull final GitRepository repository,
                                 @NotNull final GitRemote remote,
                                 @NotNull final List<? extends GitLineHandlerListener> listeners,
-                                @Nullable GitAuthenticationGate authenticationGate,
+                                @Nullable AuthenticationGate authenticationGate,
                                 final String... params) {
     return runCommand(() -> {
       GitLineHandler h = new GitLineHandler(repository.getProject(), repository.getRoot(), GitCommand.FETCH);

@@ -178,7 +178,7 @@ ReadableBuffer = Union[ReadOnlyBuffer, WriteableBuffer]  # stable
 
 # stable
 if sys.version_info >= (3, 10):
-    from types import NoneType as NoneType
+    pass
 else:
     # Used by type checkers for checks involving None (does not exist at runtime)
     @final

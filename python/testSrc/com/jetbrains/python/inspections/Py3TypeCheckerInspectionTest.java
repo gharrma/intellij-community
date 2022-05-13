@@ -762,4 +762,14 @@ public class Py3TypeCheckerInspectionTest extends PyInspectionTestCase {
                  "def foo(path_or_buf: another_union[T] | None) -> None:\n" +
                  "    print(path_or_buf)\n");
   }
+
+  // PY-46661
+  public void testTypedDictInReturnType() {
+    doTest();
+  }
+
+  // PY-52648
+  public void testListLiteralPassedToIter() {
+    doTest();
+  }
 }

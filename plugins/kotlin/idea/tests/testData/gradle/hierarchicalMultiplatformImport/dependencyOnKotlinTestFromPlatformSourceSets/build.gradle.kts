@@ -16,7 +16,7 @@ group = "project"
 version = "1.0"
 
 kotlin {
-    jvm() 
+    jvm()
     js()
     linuxX64()
 

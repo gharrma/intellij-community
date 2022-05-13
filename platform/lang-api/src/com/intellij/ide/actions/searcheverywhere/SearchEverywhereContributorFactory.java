@@ -1,7 +1,6 @@
 package com.intellij.ide.actions.searcheverywhere;
 
 import com.intellij.openapi.actionSystem.AnActionEvent;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -18,12 +17,18 @@ public interface SearchEverywhereContributorFactory<Item> {
   SearchEverywhereContributor<Item> createContributor(@NotNull AnActionEvent initEvent);
 
   /**
+   * Returns 'true' if the contributor is available and should be created
+   */
+  default boolean isAvailable() {
+    return true;
+  }
+
+  /**
    * Not used and going to be deleted next releases.
    * @deprecated to be removed in IDEA 2022.2
    */
   @NotNull
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval(inVersion = "2022.2")
+  @Deprecated(forRemoval = true)
   default SearchEverywhereTabDescriptor getTab() {
     return SearchEverywhereTabDescriptor.PROJECT;
   }

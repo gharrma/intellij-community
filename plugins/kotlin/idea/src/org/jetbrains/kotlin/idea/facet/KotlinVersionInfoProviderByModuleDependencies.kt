@@ -6,16 +6,16 @@ import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.LibraryOrderEntry
 import com.intellij.openapi.roots.ModuleRootManager
 import com.intellij.openapi.roots.ModuleRootModel
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinPluginLayout
 import org.jetbrains.kotlin.idea.platform.tooling
-import org.jetbrains.kotlin.idea.versions.bundledRuntimeVersion
 import org.jetbrains.kotlin.platform.IdePlatformKind
 
 class KotlinVersionInfoProviderByModuleDependencies : KotlinVersionInfoProvider {
-    override fun getCompilerVersion(module: Module) = bundledRuntimeVersion()
+    override fun getCompilerVersion(module: Module) = KotlinPluginLayout.instance.standaloneCompilerVersion
 
     override fun getLibraryVersions(
         module: Module,
-        platformKind: IdePlatformKind<*>,
+        platformKind: IdePlatformKind,
         rootModel: ModuleRootModel?
     ): Collection<String> {
         if (module.isDisposed) {

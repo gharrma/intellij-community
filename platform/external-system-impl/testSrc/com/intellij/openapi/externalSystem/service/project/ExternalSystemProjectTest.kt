@@ -9,26 +9,27 @@ import com.intellij.openapi.externalSystem.model.project.ExternalSystemSourceTyp
 import com.intellij.openapi.externalSystem.model.project.ExternalSystemSourceType.*
 import com.intellij.openapi.externalSystem.model.project.LibraryLevel
 import com.intellij.openapi.externalSystem.model.project.LibraryPathType
-import com.intellij.openapi.externalSystem.test.ExternalSystemProjectTestCase
-import com.intellij.openapi.externalSystem.test.ExternalSystemTestCase.collectRootsInside
-import com.intellij.openapi.externalSystem.test.ExternalSystemTestUtil.assertMapsEqual
-import com.intellij.openapi.externalSystem.test.Project
-import com.intellij.openapi.externalSystem.test.toDataNode
+import com.intellij.openapi.externalSystem.test.javaProject
 import com.intellij.openapi.externalSystem.util.ExternalSystemApiUtil
 import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.projectRoots.JavaSdk
 import com.intellij.openapi.projectRoots.ProjectJdkTable
 import com.intellij.openapi.projectRoots.impl.SdkConfigurationUtil
 import com.intellij.openapi.roots.*
+import com.intellij.openapi.util.SystemInfo
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.vfs.LocalFileSystem
 import com.intellij.openapi.vfs.VfsUtilCore
 import com.intellij.openapi.vfs.newvfs.impl.VfsRootAccess
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemProjectTestCase
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestCase.collectRootsInside
+import com.intellij.platform.externalSystem.testFramework.toDataNode
 import com.intellij.pom.java.LanguageLevel
 import com.intellij.testFramework.IdeaTestUtil
 import com.intellij.util.PathUtil
 import junit.framework.TestCase
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.entry
 import org.junit.Test
 import java.io.File
 
@@ -82,7 +83,10 @@ class ExternalSystemProjectTest : ExternalSystemProjectTestCase() {
     val entries = modelsProvider.getOrderEntries(module!!)
     val dependencies = mutableMapOf<String?, Int>()
     entries.groupingBy { (it as? LibraryOrderEntry)?.libraryName }.eachCountTo(dependencies).remove(null)
-    assertMapsEqual(mapOf("Test_external_system_id: lib1" to 1, "Test_external_system_id: lib2" to 1), dependencies)
+    assertThat(dependencies).containsExactly(
+      entry("Test_external_system_id: lib1", 1),
+      entry("Test_external_system_id: lib2", 1)
+    )
   }
 
   @Test
@@ -122,6 +126,7 @@ class ExternalSystemProjectTest : ExternalSystemProjectTestCase() {
   fun `test optimized method for getting modules libraries order entries`() {
     val libBinPath = File(projectPath, "bin_path")
     val libSrcPath = File(projectPath, "source_path")
+    val namedlibPath = File(projectPath, "named_lib")
 
     FileUtil.createDirectory(libBinPath)
     FileUtil.createDirectory(libSrcPath)
@@ -133,6 +138,9 @@ class ExternalSystemProjectTest : ExternalSystemProjectTestCase() {
         }
         lib("", level = LibraryLevel.MODULE) {
           roots(LibraryPathType.BINARY, libSrcPath.absolutePath)
+        }
+        lib("named", level = LibraryLevel.MODULE) {
+          roots(LibraryPathType.BINARY, namedlibPath.absolutePath)
         }
       }
     }
@@ -152,7 +160,7 @@ class ExternalSystemProjectTest : ExternalSystemProjectTestCase() {
       .map { it.data }
 
     val libraryOrderEntries = modelsProvider.findIdeModuleLibraryOrderEntries(moduleNode.data, libraryDependencyDataList)
-    assertThat(libraryOrderEntries).hasSize(2)
+    assertThat(libraryOrderEntries).hasSize(3)
 
     for ((libraryEntry, libraryData) in libraryOrderEntries) {
       val expected = libraryData.target.getPaths(LibraryPathType.BINARY).map(PathUtil::getLocalPath)
@@ -205,14 +213,17 @@ class ExternalSystemProjectTest : ExternalSystemProjectTestCase() {
         folders.merge("excluded", contentEntry.excludeFolders.size, Integer::sum)
       }
     }
-    assertMapsEqual(mapOf("source" to 4, "excluded" to 2), folders)
+    assertThat(folders).containsExactly(entry("source", 4), entry("excluded", 2))
   }
 
   @Test
   fun `test import does not fail if filename contains space`() {
+    val nameWithTrailingSpace = "source2 "
     val contentRoots = mapOf(
-      SOURCE to listOf(" source1", "source2 ", "source 3")
+      SOURCE to listOf(" source1", nameWithTrailingSpace, "source 3")
     )
+    // note, dir.mkdirs() used at ExternalSystemProjectTestCase.createProjectSubDirectory -> FileUtil.ensureExists
+    // will create "source2" instead of "source2 " on disk on Windows
     contentRoots.forEach { (_, v) -> v.forEach { createProjectSubDirectory(it) } }
     applyProjectModel(buildProjectModel(contentRoots), buildProjectModel(contentRoots))
     val modelsProvider = IdeModelsProviderImpl(project)
@@ -225,7 +236,8 @@ class ExternalSystemProjectTest : ExternalSystemProjectTestCase() {
         .filterIsInstance<ModuleSourceOrderEntry>()
         .flatMap { it.rootModel.contentEntries.asIterable() }
         .forEach { contentEntry -> folders.addAll(contentEntry.sourceFolders.map { File(it.url).name }) }
-      TestCase.assertEquals(contentRoots[SOURCE], folders)
+      val expected = if (SystemInfo.isWindows) contentRoots[SOURCE]!! - nameWithTrailingSpace else contentRoots[SOURCE]
+      TestCase.assertEquals(expected, folders)
     }
   }
 
@@ -312,7 +324,7 @@ class ExternalSystemProjectTest : ExternalSystemProjectTestCase() {
         }
       }
     }
-    assertMapsEqual(mapOf("Test_external_system_id: lib1" to 1), dependencies)
+    assertThat(dependencies).containsExactly(entry("Test_external_system_id: lib1", 1))
   }
 
   @Test

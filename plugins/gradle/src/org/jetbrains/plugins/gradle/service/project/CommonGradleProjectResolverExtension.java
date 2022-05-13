@@ -328,7 +328,9 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
         }
       }
 
-      if (!resolverCtx.isResolveModulePerSourceSet()) {
+      boolean sourceSetsAreNotConfigured = sourceSetContentRoots.isEmpty();
+
+      if (!resolverCtx.isResolveModulePerSourceSet() || sourceSetsAreNotConfigured) {
         List<? extends IdeaSourceDirectory> sourceDirectories = gradleContentRoot.getSourceDirectories().getAll();
         List<? extends IdeaSourceDirectory> testDirectories = gradleContentRoot.getTestDirectories().getAll();
         List<? extends IdeaSourceDirectory> resourceDirectories = Collections.emptyList();
@@ -923,10 +925,7 @@ public final class CommonGradleProjectResolverExtension extends AbstractProjectR
         Object result = getDependencyModule.invoke(dependency);
         return (IdeaModule)result;
       }
-      catch (IllegalAccessException e) {
-        LOG.info("Failed to get dependency module for [" + dependency + "]", e);
-      }
-      catch (InvocationTargetException e) {
+      catch (IllegalAccessException | InvocationTargetException e) {
         LOG.info("Failed to get dependency module for [" + dependency + "]", e);
       }
     }

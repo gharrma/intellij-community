@@ -412,8 +412,9 @@ public class ChangesListView extends HoverChangesTree implements DataProvider, D
     return getAllChangesUnder(change, EditedCommitNode.class);
   }
 
+  @SafeVarargs
   @Nullable
-  public List<Change> getAllChangesUnder(@NotNull Change change, Class<? extends ChangesBrowserNode<?>> @NotNull ... nodeClasses) {
+  public final List<Change> getAllChangesUnder(@NotNull Change change, Class<? extends ChangesBrowserNode<?>> @NotNull ... nodeClasses) {
     DefaultMutableTreeNode node = findNodeInTree(change);
     boolean changeListNodeRequested = ArrayUtil.contains(ChangesBrowserChangeListNode.class, nodeClasses);
 
@@ -463,17 +464,13 @@ public class ChangesListView extends HoverChangesTree implements DataProvider, D
 
   @Override
   public void processMouseEvent(final MouseEvent e) {
-    if (MouseEvent.MOUSE_RELEASED == e.getID() && !isSelectionEmpty() && !e.isShiftDown() && !e.isControlDown()  &&
+    if (MouseEvent.MOUSE_RELEASED == e.getID() && !isSelectionEmpty() && !e.isShiftDown() && !e.isControlDown() &&
         !e.isMetaDown() && !e.isPopupTrigger()) {
       if (isOverSelection(e.getPoint())) {
-        clearSelection();
-        final TreePath path = getPathForLocation(e.getPoint().x, e.getPoint().y);
-        if (path != null) {
-          setSelectionPath(path);
-        }
+        TreePath path = getPathForLocation(e.getPoint().x, e.getPoint().y);
+        setSelectionPath(path);
       }
     }
-
 
     super.processMouseEvent(e);
   }

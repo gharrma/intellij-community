@@ -2,11 +2,9 @@
 
 package org.jetbrains.kotlin.idea.completion
 
-import com.intellij.codeInsight.completion.InsertionContext
 import com.intellij.codeInsight.lookup.AutoCompletionPolicy
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementBuilder
-import com.intellij.codeInsight.lookup.LookupElementDecorator
 import com.intellij.psi.PsiElement
 import com.intellij.openapi.util.Key
 import org.jetbrains.kotlin.idea.completion.handlers.WithTailInsertHandler
@@ -18,6 +16,9 @@ import org.jetbrains.kotlin.psi.psiUtil.isAncestor
 import org.jetbrains.kotlin.psi.psiUtil.containingClassOrObject
 import org.jetbrains.kotlin.psi.psiUtil.parentsWithSelf
 import org.jetbrains.kotlin.renderer.render
+
+val PsiElement.isInsideKtTypeReference: Boolean
+    get() = getNonStrictParentOfType<KtTypeReference>() != null
 
 fun createKeywordElement(
     keyword: String,
@@ -64,11 +65,7 @@ fun createKeywordElementWithSpace(
 ): LookupElement {
     val element = createKeywordElement(keyword, tail, lookupObject)
     return if (addSpaceAfter) {
-        object : LookupElementDecorator<LookupElement>(element) {
-            override fun handleInsert(context: InsertionContext) {
-                WithTailInsertHandler.SPACE.handleInsert(context, delegate)
-            }
-        }
+        element.withInsertHandler(WithTailInsertHandler.SPACE.asPostInsertHandler)
     } else {
         element
     }

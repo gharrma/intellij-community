@@ -16,29 +16,28 @@ import org.jetbrains.kotlin.idea.caches.resolve.analyzeWithContent
 import org.jetbrains.kotlin.idea.caches.resolve.findModuleDescriptor
 import org.jetbrains.kotlin.idea.caches.resolve.getResolutionFacade
 import org.jetbrains.kotlin.idea.core.quickfix.QuickFixUtil
+import org.jetbrains.kotlin.idea.intentions.branches
 import org.jetbrains.kotlin.idea.intentions.reflectToRegularFunctionType
 import org.jetbrains.kotlin.idea.project.languageVersionSettings
 import org.jetbrains.kotlin.idea.util.approximateWithResolvableType
 import org.jetbrains.kotlin.idea.util.getResolutionScope
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.*
-import org.jetbrains.kotlin.psi.psiUtil.getParentOfType
+import org.jetbrains.kotlin.psi.psiUtil.collectDescendantsOfType
 import org.jetbrains.kotlin.psi.psiUtil.getQualifiedExpressionForSelectorOrThis
 import org.jetbrains.kotlin.psi.psiUtil.getStrictParentOfType
 import org.jetbrains.kotlin.resolve.BindingContext
 import org.jetbrains.kotlin.resolve.DescriptorToSourceUtils
 import org.jetbrains.kotlin.resolve.bindingContextUtil.getTargetFunction
-import org.jetbrains.kotlin.resolve.calls.util.getParameterForArgument
-import org.jetbrains.kotlin.resolve.calls.util.getParentResolvedCall
-import org.jetbrains.kotlin.resolve.calls.util.getResolvedCall
-import org.jetbrains.kotlin.resolve.calls.util.getValueArgumentForExpression
+import org.jetbrains.kotlin.resolve.bindingContextUtil.getTargetFunctionDescriptor
+import org.jetbrains.kotlin.resolve.calls.util.*
 import org.jetbrains.kotlin.resolve.calls.model.ResolvedCall
 import org.jetbrains.kotlin.resolve.constants.IntegerValueTypeConstant
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.descriptorUtil.module
 import org.jetbrains.kotlin.resolve.jvm.diagnostics.ErrorsJvm
+import org.jetbrains.kotlin.types.CommonSupertypes
 import org.jetbrains.kotlin.types.KotlinType
-import org.jetbrains.kotlin.types.TypeProjection
 import org.jetbrains.kotlin.types.TypeUtils
 import org.jetbrains.kotlin.types.TypeUtils.NO_EXPECTED_TYPE
 import org.jetbrains.kotlin.types.isDefinitelyNotNullType
@@ -226,7 +225,8 @@ class QuickFixFactoryForTypeMismatchError : KotlinIntentionActionsFactory() {
             if (QuickFixUtil.canEvaluateTo(initializer, diagnosticElement)
                 || getter != null && QuickFixUtil.canFunctionOrGetterReturnExpression(getter, diagnosticElement)
             ) {
-                addChangeTypeFix(property, expressionType, ::ChangeVariableTypeFix)
+                val returnType = property.returnType(diagnosticElement, expressionType, context)
+                addChangeTypeFix(property, returnType, ::ChangeVariableTypeFix)
             }
         }
 
@@ -239,7 +239,8 @@ class QuickFixFactoryForTypeMismatchError : KotlinIntentionActionsFactory() {
         else
             PsiTreeUtil.getParentOfType(diagnosticElement, KtFunction::class.java, true)
         if (function is KtFunction && QuickFixUtil.canFunctionOrGetterReturnExpression(function, diagnosticElement)) {
-            addChangeTypeFix(function, expressionType, ChangeCallableReturnTypeFix::ForEnclosing)
+            val returnType = function.returnType(diagnosticElement, expressionType, context)
+            addChangeTypeFix(function, returnType, ChangeCallableReturnTypeFix::ForEnclosing)
         }
 
         // Fixing overloaded operators:
@@ -317,6 +318,40 @@ class QuickFixFactoryForTypeMismatchError : KotlinIntentionActionsFactory() {
             }
         }
         return actions
+    }
+
+    private fun KtCallableDeclaration.returnType(
+        diagnosticElement: KtExpression,
+        candidateType: KotlinType,
+        context: BindingContext
+    ): KotlinType {
+        val (initializers, functionOrGetter) = when (this) {
+            is KtNamedFunction -> listOfNotNull(this.initializer) to this
+            is KtProperty -> listOfNotNull(this.initializer, this.getter?.initializer) to this.getter
+            else -> return candidateType
+        }
+        val returnedExpressions = if (functionOrGetter != null) {
+            val descriptor = context[BindingContext.DECLARATION_TO_DESCRIPTOR, functionOrGetter]
+            functionOrGetter
+                .collectDescendantsOfType<KtReturnExpression> { it.getTargetFunctionDescriptor(context) == descriptor }
+                .mapNotNull { it.returnedExpression }
+                .plus(initializers)
+        } else {
+            initializers
+        }.mapNotNull { KtPsiUtil.deparenthesize(it) }
+
+        return if (returnedExpressions.singleOrNull() == diagnosticElement) {
+            candidateType
+        } else {
+            val returnTypes = returnedExpressions.flatMap {
+                when (it) {
+                    is KtIfExpression -> it.branches
+                    is KtWhenExpression -> it.entries.map { entry -> entry.expression }
+                    else -> listOf(it)
+                }
+            }.mapNotNull { it?.getType(context) }.ifEmpty { listOf(candidateType) }
+            returnTypes.singleOrNull() ?: CommonSupertypes.commonSupertype(returnTypes)
+        }
     }
 
     companion object {

@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.codeInsight.hints
 
 import com.intellij.lang.Language
@@ -15,6 +15,7 @@ import com.intellij.openapi.util.NlsContexts
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiFileFactory
 import com.intellij.util.xmlb.annotations.Property
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import javax.swing.JComponent
 import kotlin.reflect.KMutableProperty0
@@ -22,6 +23,7 @@ import kotlin.reflect.KMutableProperty0
 private const val EXTENSION_POINT_NAME = "com.intellij.codeInsight.inlayProvider"
 
 enum class InlayGroup(val key: String) {
+  CODE_VISION_GROUP_NEW("settings.hints.new.group.code.vision"),
   CODE_VISION_GROUP("settings.hints.group.code.vision"),
   PARAMETERS_GROUP("settings.hints.group.parameters"),
   TYPES_GROUP("settings.hints.group.types"),
@@ -63,6 +65,7 @@ object InlayHintsProviderExtension : LanguageExtension<InlayHintsProvider<*>>(EX
  * @see com.intellij.openapi.editor.InlayModel.addBlockElement
  *
  * To test it you may use InlayHintsProviderTestCase.
+ * Mark as [com.intellij.openapi.project.DumbAware] to enable it in dumb mode.
  */
 interface InlayHintsProvider<T : Any> {
   /**
@@ -70,6 +73,14 @@ interface InlayHintsProvider<T : Any> {
    * Warning! Your collector should not use any settings besides [settings]
    */
   fun getCollectorFor(file: PsiFile, editor: Editor, settings: T, sink: InlayHintsSink): InlayHintsCollector?
+
+  /**
+   * Returns quick collector of placeholders.
+   * Placeholders are shown on editor opening and stay until [getCollectorFor] collector hints are calculated.
+   */
+  @ApiStatus.Experimental
+  @JvmDefault
+  fun getPlaceholdersCollectorFor(file: PsiFile, editor: Editor, settings: T, sink: InlayHintsSink): InlayHintsCollector? = null
 
   /**
    * Settings must be plain java object, fields of these settings will be copied via serialization.
@@ -97,6 +108,7 @@ interface InlayHintsProvider<T : Any> {
 
   @JvmDefault
   val description: String?
+    @Nls
     get() {
       return getProperty("inlay." + key.id + ".description")
     }
@@ -125,6 +137,16 @@ interface InlayHintsProvider<T : Any> {
   @Nls
   @JvmDefault
   fun getProperty(key: String): String? = null
+
+  @JvmDefault
+  fun preparePreview(editor: Editor, file: PsiFile, settings: T) {
+  }
+
+  @Nls
+  @JvmDefault
+  fun getCaseDescription(case: ImmediateConfigurable.Case): String? {
+    return getProperty("inlay." + this.key.id + "." + case.id)
+  }
 
   val isVisibleInSettings: Boolean
     get() = true

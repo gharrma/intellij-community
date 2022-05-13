@@ -354,4 +354,8 @@ abstract class OverrideImplementTest<T : ClassMember> : AbstractOverrideImplemen
    open fun testImplementWithComment4() {
         doMultiImplementFileTest()
     }
+
+    fun testGenericClass() {
+        doMultiImplementFileTest()
+    }
 }

@@ -1,19 +1,41 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.intellij.build.testFramework
 
 import com.intellij.openapi.util.io.FileUtil
 import com.intellij.openapi.util.io.NioFiles
+import com.intellij.rt.execution.junit.FileComparisonFailure
 import com.intellij.testFramework.TestLoggerFactory
+import com.intellij.util.ExceptionUtil
+import io.opentelemetry.api.trace.StatusCode
+import io.opentelemetry.exporter.jaeger.JaegerGrpcSpanExporter
 import org.jetbrains.intellij.build.*
+import org.jetbrains.intellij.build.impl.TracerManager
+import org.jetbrains.intellij.build.impl.TracerProviderManager
 import org.jetbrains.intellij.build.impl.logging.BuildMessagesImpl
+import org.junit.AssumptionViolatedException
+import java.net.http.HttpConnectTimeoutException
+import java.nio.file.Files
+import java.nio.file.NoSuchFileException
 import java.nio.file.Path
-import kotlin.io.path.copyTo
+import java.nio.file.StandardCopyOption
 
-fun createBuildContext(homePath: String, productProperties: ProductProperties,
-                       buildTools: ProprietaryBuildTools,
-                       skipDependencySetup: Boolean = false,
-                       communityHomePath: String = "$homePath/community",
-                       buildOptionsCustomizer: (BuildOptions) -> Unit = {}): BuildContext {
+private val initializeTracer by lazy {
+  val endpoint = System.getenv("JAEGER_ENDPOINT")
+  if (endpoint != null) {
+    val defaultExporters = TracerProviderManager.getSpanExporterProvider().get()
+    TracerProviderManager.setSpanExporterProvider {
+      defaultExporters + JaegerGrpcSpanExporter.builder().setEndpoint(endpoint).build()
+    }
+  }
+}
+
+fun createBuildContext(
+  homePath: String, productProperties: ProductProperties,
+  buildTools: ProprietaryBuildTools = ProprietaryBuildTools.DUMMY,
+  skipDependencySetup: Boolean = false,
+  communityHomePath: String = "$homePath/community",
+  buildOptionsCustomizer: (BuildOptions) -> Unit = {},
+): BuildContext {
   val options = BuildOptions()
   options.isSkipDependencySetup = skipDependencySetup
   options.isIsTestBuild = true
@@ -25,38 +47,120 @@ fun createBuildContext(homePath: String, productProperties: ProductProperties,
   return BuildContext.createContext(communityHomePath, homePath, productProperties, buildTools, options)
 }
 
-fun runTestBuild(homePath: String,
-                 productProperties: ProductProperties,
-                 buildTools: ProprietaryBuildTools,
-                 communityHomePath: String = "$homePath/community",
-                 verifier: (outDir: Path) -> Unit = {},
-                 buildOptionsCustomizer: (BuildOptions) -> Unit = {}) {
-  val buildContext = createBuildContext(homePath, productProperties, buildTools, false, communityHomePath, buildOptionsCustomizer)
-  val outDir = Path.of(buildContext.options.outputRootPath)
-  buildContext.messages.debug("Build output root is at ${outDir}")
+fun runTestBuild(
+  homePath: String,
+  productProperties: ProductProperties,
+  buildTools: ProprietaryBuildTools = ProprietaryBuildTools.DUMMY,
+  communityHomePath: String = "$homePath/community",
+  traceSpanName: String? = null,
+  verifier: (paths: BuildPaths) -> Unit = {},
+  buildOptionsCustomizer: (BuildOptions) -> Unit = {},
+) {
+  val buildContext = createBuildContext(
+    homePath = homePath,
+    productProperties = productProperties,
+    buildTools = buildTools,
+    skipDependencySetup = false,
+    communityHomePath = communityHomePath,
+    buildOptionsCustomizer = buildOptionsCustomizer,
+  )
+
+  runTestBuild(
+    buildContext = buildContext,
+    traceSpanName = traceSpanName,
+    verifier = verifier,
+  )
+}
+
+fun runTestBuild(
+  buildContext: BuildContext,
+  traceSpanName: String? = null,
+  verifier: (paths: BuildPaths) -> Unit = {},
+) {
+  initializeTracer
+
+  val productProperties = buildContext.productProperties
+
+  // to see in Jaeger as a one trace
+  val traceFileName = "${productProperties.baseFileName}-trace.json"
+  val span = TracerManager.spanBuilder(traceSpanName ?: "test build of ${productProperties.baseFileName}").startSpan()
+  var spanEnded = false
+  val spanScope = span.makeCurrent()
+
   try {
+    val outDir = buildContext.paths.buildOutputDir
+    span.setAttribute("outDir", outDir.toString())
+    val messages = buildContext.messages as BuildMessagesImpl
     try {
       BuildTasks.create(buildContext).runTestBuild()
-      verifier(outDir)
+      verifier(buildContext.paths)
     }
     catch (e: Throwable) {
+      if (e !is FileComparisonFailure) {
+        span.recordException(e)
+      }
+      span.setStatus(StatusCode.ERROR)
+
+      copyDebugLog(productProperties, messages)
+
+      if (ExceptionUtil.causedBy(e, HttpConnectTimeoutException::class.java)) {
+        //todo use com.intellij.platform.testFramework.io.ExternalResourcesChecker after next update of jps-bootstrap library
+        throw AssumptionViolatedException("failed to load data for build scripts", e)
+      }
+      else {
+        throw e
+      }
+    }
+    finally {
+      // redirect debug logging to some other file to prevent locking of output directory on Windows
+      val newDebugLog = FileUtil.createTempFile("debug-log-", ".log", true)
+      messages.setDebugLogPath(newDebugLog.toPath())
+
+      spanScope.close()
+      span.end()
+      spanEnded = true
+      copyPerfReport(traceFileName)
+
       try {
-        val logFile = (buildContext.messages as BuildMessagesImpl).debugLogFile
-        val targetFile = Path.of(TestLoggerFactory.getTestLogDir(), "${productProperties.baseFileName}-test-build-debug.log")
-        logFile.toPath().copyTo(targetFile)
-        buildContext.messages.info("Debug log copied to $targetFile")
+        NioFiles.deleteRecursively(outDir)
       }
-      catch (copyingException: Throwable) {
-        buildContext.messages.info("Failed to copy debug log: ${e.message}")
+      catch (e: Throwable) {
+        System.err.println("cannot cleanup $outDir:")
+        e.printStackTrace(System.err)
       }
-      throw e
     }
   }
   finally {
-    // Redirect debug logging to some other file to prevent locking of output directory on Windows
-    val newDebugLog = FileUtil.createTempFile("debug-log-", ".log", true)
-    (buildContext.messages as BuildMessagesImpl).setDebugLogPath(newDebugLog.toPath())
+    if (!spanEnded) {
+      spanScope.close()
+      span.end()
+    }
+  }
+}
 
-    NioFiles.deleteRecursively(outDir)
+private fun copyDebugLog(productProperties: ProductProperties, messages: BuildMessagesImpl) {
+  try {
+    val targetFile = Path.of(TestLoggerFactory.getTestLogDir(), "${productProperties.baseFileName}-test-build-debug.log")
+    Files.createDirectories(targetFile.parent)
+    Files.copy(messages.debugLogFile, targetFile, StandardCopyOption.REPLACE_EXISTING)
+    messages.info("Debug log copied to $targetFile")
+  }
+  catch (e: Throwable) {
+    messages.warning("Failed to copy debug log: ${e.message}")
+  }
+}
+
+private fun copyPerfReport(traceFileName: String) {
+  val targetFile = Path.of(TestLoggerFactory.getTestLogDir(), traceFileName)
+  Files.createDirectories(targetFile.parent)
+  val file = TracerManager.finish() ?: return
+  try {
+    Files.copy(file, targetFile, StandardCopyOption.REPLACE_EXISTING)
+    println("Performance report is written to $targetFile")
+  }
+  catch (ignore: NoSuchFileException) {
+  }
+  catch (e: Throwable) {
+    System.err.println("cannot write performance report: ${e.message}")
   }
 }

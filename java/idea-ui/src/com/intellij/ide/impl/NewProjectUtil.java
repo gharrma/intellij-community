@@ -1,17 +1,21 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.impl;
 
 import com.intellij.feedback.state.projectCreation.ProjectCreationInfoService;
 import com.intellij.feedback.state.projectCreation.ProjectCreationInfoState;
 import com.intellij.ide.JavaUiBundle;
 import com.intellij.ide.SaveAndSyncHandler;
+import com.intellij.ide.projectWizard.NewProjectWizardCollector;
 import com.intellij.ide.util.newProjectWizard.AbstractProjectWizard;
 import com.intellij.ide.util.projectWizard.AbstractModuleBuilder;
 import com.intellij.ide.util.projectWizard.ProjectBuilder;
+import com.intellij.ide.util.projectWizard.WizardContext;
+import com.intellij.internal.statistic.StructuredIdeActivity;
 import com.intellij.internal.statistic.service.fus.collectors.FUCounterUsageLogger;
 import com.intellij.internal.statistic.utils.PluginInfo;
 import com.intellij.internal.statistic.utils.PluginInfoDetectorKt;
 import com.intellij.openapi.application.ApplicationManager;
+import com.intellij.openapi.application.Experiments;
 import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.command.CommandProcessor;
 import com.intellij.openapi.components.StorageScheme;
@@ -33,8 +37,8 @@ import com.intellij.openapi.vfs.VfsUtilCore;
 import com.intellij.openapi.wm.ToolWindow;
 import com.intellij.openapi.wm.ToolWindowId;
 import com.intellij.openapi.wm.ToolWindowManager;
+import com.intellij.util.TimeoutUtil;
 import com.intellij.util.ui.UIUtil;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -51,8 +55,7 @@ public final class NewProjectUtil {
   /**
    * @deprecated Use {@link #createNewProject(AbstractProjectWizard)}, projectToClose param is not used.
    */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval(inVersion = "2021.3")
+  @Deprecated(forRemoval = true)
   public static void createNewProject(@Nullable Project projectToClose, @NotNull AbstractProjectWizard wizard) {
     createNewProject(wizard);
   }
@@ -61,8 +64,23 @@ public final class NewProjectUtil {
     String title = JavaUiBundle.message("project.new.wizard.progress.title");
     Runnable warmUp = () -> ProjectManager.getInstance().getDefaultProject();  // warm-up components
     boolean proceed = ProgressManager.getInstance().runProcessWithProgressSynchronously(warmUp, title, true, null);
+
+    long time = 0;
+    WizardContext context = wizard.getWizardContext();
+    if (isNewWizard()) {
+      time = System.nanoTime();
+      NewProjectWizardCollector.logOpen(context);
+    }
     if (proceed && wizard.showAndGet()) {
       createFromWizard(wizard);
+      if (isNewWizard()) {
+        NewProjectWizardCollector.logFinish(context, true, TimeoutUtil.getDurationMillis(time));
+      }
+      return;
+    }
+
+    if (isNewWizard()) {
+      NewProjectWizardCollector.logFinish(context, false, TimeoutUtil.getDurationMillis(time));
     }
   }
 
@@ -75,6 +93,9 @@ public final class NewProjectUtil {
       Project newProject = doCreate(wizard, projectToClose);
       recordProjectCreatedFromWizard(wizard);
       FUCounterUsageLogger.getInstance().logEvent(newProject, "new.project.wizard", "project.created");
+      if (isNewWizard()) {
+        NewProjectWizardCollector.logProjectCreated(newProject, wizard.getWizardContext());
+      }
       return newProject;
     }
     catch (IOException e) {
@@ -85,7 +106,7 @@ public final class NewProjectUtil {
   }
 
   private static void recordProjectCreatedFromWizard(@NotNull AbstractProjectWizard wizard) {
-    if (Registry.is("platform.feedback", false)) {
+    if (Registry.is("platform.feedback", true)) {
       final ProjectBuilder projectBuilder = wizard.getWizardContext().getProjectBuilder();
       if (projectBuilder instanceof AbstractModuleBuilder) {
         final PluginInfo pluginInfo = PluginInfoDetectorKt.getPluginInfo(projectBuilder.getClass());
@@ -134,7 +155,7 @@ public final class NewProjectUtil {
       if (projectBuilder == null || !projectBuilder.isUpdate()) {
         String name = wizard.getProjectName();
         if (projectBuilder == null) {
-          newProject = projectManager.newProject(projectFile, OpenProjectTask.newProject().withProjectName(name));
+          newProject = projectManager.newProject(projectFile, OpenProjectTask.build().asNewProject().withProjectName(name));
         }
         else {
           newProject = projectBuilder.createProject(name, projectFilePath);
@@ -146,11 +167,6 @@ public final class NewProjectUtil {
 
       if (newProject == null) {
         return projectToClose;
-      }
-
-      Sdk jdk = wizard.getNewProjectJdk();
-      if (jdk != null) {
-        CommandProcessor.getInstance().executeCommand(newProject, () -> ApplicationManager.getApplication().runWriteAction(() -> JavaSdkUtil.applyJdkToProject(newProject, jdk)), null, null);
       }
 
       String compileOutput = wizard.getNewCompileOutput();
@@ -167,6 +183,11 @@ public final class NewProjectUtil {
         }
 
         projectBuilder.commit(newProject, null, ModulesProvider.EMPTY_MODULES_PROVIDER);
+      }
+
+      Sdk jdk = wizard.getNewProjectJdk();
+      if (jdk != null) {
+        CommandProcessor.getInstance().executeCommand(newProject, () -> ApplicationManager.getApplication().runWriteAction(() -> JavaSdkUtil.applyJdkToProject(newProject, jdk)), null, null);
       }
 
       if (!ApplicationManager.getApplication().isUnitTestMode()) {
@@ -189,7 +210,7 @@ public final class NewProjectUtil {
 
       if (newProject != projectToClose) {
         ProjectUtil.updateLastProjectLocation(projectFile);
-        OpenProjectTask options = OpenProjectTask.withCreatedProject(newProject);
+        OpenProjectTask options = OpenProjectTask.build().withProject(newProject);
         Path fileName = projectFile.getFileName();
         if (fileName != null) {
           options = options.withProjectName(fileName.toString());
@@ -228,5 +249,9 @@ public final class NewProjectUtil {
   @Deprecated()
   public static void applyJdkToProject(@NotNull Project project, @NotNull Sdk jdk) {
     JavaSdkUtil.applyJdkToProject(project, jdk);
+  }
+
+  private static boolean isNewWizard() {
+    return Experiments.getInstance().isFeatureEnabled("new.project.wizard");
   }
 }

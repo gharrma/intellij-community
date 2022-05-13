@@ -637,6 +637,21 @@ interface UastApiTestBase : UastPluginSelection {
         )
     }
 
+    fun checkCallbackForComplicatedTypes(uFilePath: String, uFile: UFile) {
+        val render = StringBuilder()
+        uFile.accept(object: AbstractUastVisitor(){
+            override fun visitCallExpression(node: UCallExpression): Boolean {
+                render.appendLine("${node.asRenderString()} -> typeArguments: ${node.typeArguments}")
+                return super.visitCallExpression(node)
+            }
+        })
+        TestCase.assertEquals("""
+                getGenericSuperclass() -> typeArguments: []
+                getActualTypeArguments() -> typeArguments: []
+                first() -> typeArguments: []
+            """.trimIndent(), render.toString().trimEnd())
+    }
+
     fun checkCallbackForSAM(uFilePath: String, uFile: UFile) {
         TestCase.assertNull(uFile.findElementByText<ULambdaExpression>("{ /* Not SAM */ }").functionalInterfaceType)
         TestCase.assertEquals(

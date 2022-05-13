@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.internal.inspector;
 
 import com.google.common.base.MoreObjects;
@@ -44,12 +44,12 @@ import com.intellij.openapi.util.text.StringUtil;
 import com.intellij.openapi.wm.IdeFocusManager;
 import com.intellij.openapi.wm.ToolWindowEP;
 import com.intellij.openapi.wm.ToolWindowFactory;
-import com.intellij.openapi.wm.impl.StripeButton;
 import com.intellij.openapi.wm.impl.ToolWindowImpl;
 import com.intellij.openapi.wm.impl.status.TextPanel;
 import com.intellij.pom.Navigatable;
 import com.intellij.psi.PsiElement;
 import com.intellij.psi.search.GlobalSearchScope;
+import com.intellij.toolWindow.StripeButton;
 import com.intellij.ui.*;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.border.CustomLineBorder;
@@ -364,14 +364,15 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
       if (myProject != null) {
         try {
           String javaPsiFacadeFqn = "com.intellij.psi.JavaPsiFacade";
-          PluginId pluginId = PluginManager.getPluginByClassName(javaPsiFacadeFqn);
+          PluginId pluginId = PluginManager.getPluginByClassNameAsNoAccessToClass(javaPsiFacadeFqn);
           Class<?> facade = null;
           if (pluginId != null) {
             IdeaPluginDescriptor plugin = PluginManager.getInstance().findEnabledPlugin(pluginId);
             if (plugin != null) {
               facade = Class.forName(javaPsiFacadeFqn, false, plugin.getPluginClassLoader());
             }
-          } else {
+          }
+          else {
             facade = Class.forName(javaPsiFacadeFqn);
           }
           if (facade != null) {
@@ -492,7 +493,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
         color = JBColor.BLUE;
       }
 
-      Insets insets = component instanceof JComponent ? ((JComponent)component).getInsets() : JBUI.emptyInsets();
+      Insets insets = component instanceof JComponent ? ((JComponent)component).getInsets() : JBInsets.emptyInsets();
       HighlightComponent highlightComponent = new HighlightComponent(color, insets);
       highlightComponent.setBounds(bounds);
 
@@ -1343,6 +1344,12 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
       sb.append(StringUtil.toUpperCase(hex));
 
       if (value instanceof UIResource) sb.append(" UIResource");
+      if (value instanceof JBColor) {
+        String name = ((JBColor)value).getName();
+        if (!StringUtil.isEmpty(name)) {
+          sb.append(" name: ").append(name);
+        }
+      }
       setText(sb.toString());
       setIcon(createColorIcon(value));
     }
@@ -1434,7 +1441,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
     }
 
     @Nullable
-    private static Color getBorderColor(@NotNull Border value) {
+    private static Color getBorderColor(@Nullable Border value) {
       if (value instanceof LineBorder) {
         return ((LineBorder)value).getLineColor();
       }
@@ -1571,7 +1578,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
       "getCellRenderer", "getCellEditor",
       "getMinimumSize", "getMaximumSize", "getPreferredSize",
       "getPreferredScrollableViewportSize",
-      "getText", "isEditable", "getIcon",
+      "getText", "toString", "isEditable", "getIcon",
       "getVisibleRect", "getLayout",
       "getAlignmentX", "getAlignmentY",
       "getTooltipText", "getToolTipText", "cursor",
@@ -1784,7 +1791,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
 
     private void addToolWindowInfo(Object component) {
       if (component instanceof StripeButton) {
-        ToolWindowImpl window = ((StripeButton)component).getToolWindow();
+        ToolWindowImpl window = ((StripeButton)component).getToolWindow$intellij_platform_ide_impl();
         myProperties.add(new PropertyBean("Tool Window ID", window.getId(), true));
         myProperties.add(new PropertyBean("Tool Window Icon", window.getIcon()));
 
@@ -1802,8 +1809,6 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
     }
 
     private void addLayoutProperties(@NotNull Container component) {
-      String prefix = "  ";
-
       LayoutManager layout = component.getLayout();
       if (layout instanceof GridBagLayout) {
         GridBagLayout bagLayout = (GridBagLayout)layout;
@@ -1811,13 +1816,13 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
 
         myProperties.add(new PropertyBean("GridBagLayout constraints",
                                           String.format("defaultConstraints - %s", toString(defaultConstraints))));
-        if (bagLayout.columnWidths != null) myProperties.add(new PropertyBean(prefix + "columnWidths", Arrays.toString(bagLayout.columnWidths)));
-        if (bagLayout.rowHeights != null) myProperties.add(new PropertyBean(prefix + "rowHeights", Arrays.toString(bagLayout.rowHeights)));
-        if (bagLayout.columnWeights != null) myProperties.add(new PropertyBean(prefix + "columnWeights", Arrays.toString(bagLayout.columnWeights)));
-        if (bagLayout.rowWeights != null) myProperties.add(new PropertyBean(prefix + "rowWeights", Arrays.toString(bagLayout.rowWeights)));
+        if (bagLayout.columnWidths != null) addSubValue("columnWidths", Arrays.toString(bagLayout.columnWidths));
+        if (bagLayout.rowHeights != null) addSubValue("rowHeights", Arrays.toString(bagLayout.rowHeights));
+        if (bagLayout.columnWeights != null) addSubValue("columnWeights", Arrays.toString(bagLayout.columnWeights));
+        if (bagLayout.rowWeights != null) addSubValue("rowWeights", Arrays.toString(bagLayout.rowWeights));
 
         for (Component child : component.getComponents()) {
-          myProperties.add(new PropertyBean(prefix + getComponentName(child), toString(bagLayout.getConstraints(child))));
+          addSubValue(getComponentName(child), toString(bagLayout.getConstraints(child)));
         }
       }
       else if (layout instanceof BorderLayout) {
@@ -1827,7 +1832,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
                                           String.format("hgap - %s, vgap - %s", borderLayout.getHgap(), borderLayout.getVgap())));
 
         for (Component child : component.getComponents()) {
-          myProperties.add(new PropertyBean(prefix + getComponentName(child), borderLayout.getConstraints(child)));
+          addSubValue(getComponentName(child), borderLayout.getConstraints(child));
         }
       }
       else if (layout instanceof CardLayout) {
@@ -1849,7 +1854,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
           for (Object card : vector) {
             String cardName = ReflectionUtil.getField(card.getClass(), card, String.class, "name");
             Component child = ReflectionUtil.getField(card.getClass(), card, Component.class, "comp");
-            myProperties.add(new PropertyBean(prefix + getComponentName(child), cardName));
+            addSubValue(getComponentName(child), cardName);
           }
         }
       }
@@ -1881,7 +1886,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
         }
 
         for (Component child : component.getComponents()) {
-          myProperties.add(new PropertyBean(prefix + getComponentName(child), migLayout.getComponentConstraints(child)));
+          addSubValue(getComponentName(child), migLayout.getComponentConstraints(child));
         }
       }
       else if (layout instanceof com.intellij.ui.layout.migLayout.patched.MigLayout) {
@@ -1890,6 +1895,14 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
         addMigLayoutLayoutConstraints(migLayout.getLayoutConstraints());
         addMigLayoutAxisConstraints("MigLayout column constraints", migLayout.getColumnConstraints());
         addMigLayoutAxisConstraints("MigLayout row constraints", migLayout.getRowConstraints());
+      }
+      else if (layout instanceof GridLayout) {
+        Grid grid = ((GridLayout) layout).getRootGrid();
+        myProperties.add(new PropertyBean("GridLayout", null));
+        addSubValue("resizableColumns", grid.getResizableColumns());
+        addSubValue("columnsGaps", grid.getColumnsGaps());
+        addSubValue("resizableRows", grid.getResizableRows());
+        addSubValue("rowsGaps", grid.getRowsGaps());
       }
     }
 
@@ -2448,7 +2461,7 @@ public class UiInspectorAction extends DumbAwareAction implements LightEditCompa
     }
 
     private static @NotNull Icon load(@NotNull String path, Class<?> cls) {
-      Icon icon = IconLoader.getIcon("com/intellij/internal/inspector/icons/" + path, UiInspectorAction.class);
+      Icon icon = IconLoader.getIcon("com/intellij/internal/inspector/icons/" + path, UiInspectorAction.class.getClassLoader());
       if (cls != null) {
         COMPONENT_MAPPING.put(cls, icon);
       }

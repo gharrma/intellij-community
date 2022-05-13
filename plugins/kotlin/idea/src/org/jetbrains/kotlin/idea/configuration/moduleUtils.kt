@@ -4,14 +4,15 @@ package org.jetbrains.kotlin.idea.configuration
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.util.Key
 import org.jetbrains.kotlin.idea.KotlinVersionVerbose
-import org.jetbrains.kotlin.idea.util.buildNumber
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinJpsPluginSettings
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinPluginLayout
 import org.jetbrains.kotlin.psi.UserDataProperty
 
 var Module.externalCompilerVersion: String? by UserDataProperty(Key.create("EXTERNAL_COMPILER_VERSION"))
 
 fun Module.findExternalKotlinCompilerVersion(): KotlinVersionVerbose? {
     val externalCompilerVersion = (if (getBuildSystemType() == BuildSystemType.JPS) {
-        buildNumber
+        KotlinJpsPluginSettings.getInstance(project)?.settings?.version ?: KotlinPluginLayout.instance.standaloneCompilerVersion
     } else {
         this.externalCompilerVersion
     }) ?: return null

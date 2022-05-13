@@ -1047,7 +1047,7 @@ public abstract class HighLevelQuickFixTestGenerated extends AbstractHighLevelQu
 
         @TestMetadata("removeExternalModifier.kt")
         public void testRemoveExternalModifier() throws Exception {
-            runTest("../idea/tests/testData/quickfix/modifiers/removeExternalModifier.kt");
+            runTest("idea/tests/testData/quickfix/modifiers/removeExternalModifier.kt");
         }
 
         @TestMetadata("removeIncompatibleModifier.kt")

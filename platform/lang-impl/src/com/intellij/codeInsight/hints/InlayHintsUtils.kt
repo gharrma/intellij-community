@@ -1,18 +1,26 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.codeInsight.hints
 
+import com.intellij.codeInsight.hints.presentation.AttributesTransformerPresentation
 import com.intellij.codeInsight.hints.presentation.InlayPresentation
+import com.intellij.codeInsight.hints.presentation.RecursivelyUpdatingRootPresentation
 import com.intellij.codeInsight.hints.presentation.RootInlayPresentation
 import com.intellij.configurationStore.deserializeInto
 import com.intellij.configurationStore.serialize
 import com.intellij.lang.Language
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.application.invokeLater
+import com.intellij.openapi.editor.DefaultLanguageHighlighterColors
 import com.intellij.openapi.editor.Editor
-import com.intellij.psi.PsiElement
-import com.intellij.psi.PsiFile
-import com.intellij.psi.SyntaxTraverser
+import com.intellij.openapi.editor.markup.EffectType
+import com.intellij.openapi.editor.markup.TextAttributesEffectsBuilder
+import com.intellij.openapi.util.TextRange
+import com.intellij.psi.*
+import com.intellij.refactoring.suggested.endOffset
+import com.intellij.refactoring.suggested.startOffset
 import com.intellij.util.SmartList
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap
+import org.jetbrains.annotations.ApiStatus
 import org.jetbrains.annotations.Nls
 import org.jetbrains.annotations.Nls.Capitalization.Title
 import java.awt.Dimension
@@ -43,6 +51,14 @@ fun <T : Any> ProviderWithSettings<T>.getCollectorWrapperFor(file: PsiFile, edit
   return CollectorWithSettings(collector, key, language, sink)
 }
 
+internal fun <T : Any> ProviderWithSettings<T>.getPlaceholdersCollectorFor(file: PsiFile, editor: Editor): CollectorWithSettings<T>? {
+  val key = provider.key
+  val sink = InlayHintsSinkImpl(editor)
+  val collector = provider.getPlaceholdersCollectorFor(file, editor, settings, sink) ?: return null
+
+  return CollectorWithSettings(collector, key, language, sink)
+}
+
 internal fun <T : Any> InlayHintsProvider<T>.withSettings(language: Language, config: InlayHintsSettings): ProviderWithSettings<T> {
   val settings = getActualSettings(config, language)
   return ProviderWithSettings(ProviderInfo(language, this), settings)
@@ -51,13 +67,18 @@ internal fun <T : Any> InlayHintsProvider<T>.withSettings(language: Language, co
 internal fun <T : Any> InlayHintsProvider<T>.getActualSettings(config: InlayHintsSettings, language: Language): T =
   config.findSettings(key, language) { createSettings() }
 
-internal fun <T: Any> copySettings(from: T, provider: InlayHintsProvider<T>): T {
+internal fun <T : Any> copySettings(from: T, provider: InlayHintsProvider<T>): T {
   val settings = provider.createSettings()
   // Workaround to make a deep copy of settings. The other way is to parametrize T with something like
   // interface DeepCopyable<T> { fun deepCopy(from: T): T }, but there will be a lot of problems with recursive type bounds
   // That way was implemented and rejected
   serialize(from)?.deserializeInto(settings)
   return settings
+}
+
+internal fun strikeOutBuilder(editor: Editor): TextAttributesEffectsBuilder {
+  val effectColor = editor.colorsScheme.getAttributes(DefaultLanguageHighlighterColors.INLAY_DEFAULT).foregroundColor
+  return TextAttributesEffectsBuilder.create().coverWith(EffectType.STRIKEOUT, effectColor)
 }
 
 class CollectorWithSettings<T : Any>(
@@ -84,7 +105,13 @@ class CollectorWithSettings<T : Any>(
    * Same as [collectTraversingAndApply] but invoked on bg thread
    */
   fun collectTraversingAndApplyOnEdt(editor: Editor, file: PsiFile, enabled: Boolean) {
-    val hintsBuffer = collectTraversing(editor, file, enabled)
+    val hintsBuffer = collectTraversing(editor, file, true)
+    if (!enabled) {
+      val builder = strikeOutBuilder(editor)
+      addStrikeout(hintsBuffer.inlineHints, builder) { root, constraints -> HorizontalConstrainedPresentation(root, constraints) }
+      addStrikeout(hintsBuffer.blockAboveHints, builder) { root, constraints -> BlockConstrainedPresentation(root, constraints) }
+      addStrikeout(hintsBuffer.blockBelowHints, builder) { root, constraints -> BlockConstrainedPresentation(root, constraints) }
+    }
     invokeLater { applyToEditor(file, editor, hintsBuffer) }
   }
 
@@ -103,6 +130,19 @@ class CollectorWithSettings<T : Any>(
   }
 }
 
+internal fun <T: Any> addStrikeout(inlineHints: Int2ObjectOpenHashMap<MutableList<ConstrainedPresentation<*, T>>>,
+                          builder: TextAttributesEffectsBuilder,
+                          factory: (RootInlayPresentation<*>, T?) -> ConstrainedPresentation<*, T>
+) {
+  inlineHints.forEach {
+    it.value.replaceAll { presentation ->
+      val transformer = AttributesTransformerPresentation(presentation.root) { builder.applyTo(it) }
+      val rootPresentation = RecursivelyUpdatingRootPresentation(transformer)
+      factory(rootPresentation, presentation.constraints)
+    }
+  }
+}
+
 fun InlayPresentation.fireContentChanged() {
   fireContentChanged(Rectangle(width, height))
 }
@@ -118,6 +158,16 @@ fun InlayPresentation.fireUpdateEvent(previousDimension: Dimension) {
 fun InlayPresentation.dimension() = Dimension(width, height)
 
 private typealias ConstrPresent<C> = ConstrainedPresentation<*, C>
+
+@ApiStatus.Experimental
+fun InlayHintsSink.addCodeVisionElement(editor: Editor, offset: Int, priority: Int, presentation: InlayPresentation) {
+  val line = editor.document.getLineNumber(offset)
+  val column = offset - editor.document.getLineStartOffset(line)
+  val root = RecursivelyUpdatingRootPresentation(presentation)
+  val constraints = BlockConstraints(false, priority, InlayGroup.CODE_VISION_GROUP.ordinal, column)
+
+  addBlockElement(line, true, root, constraints)
+}
 
 object InlayHintsUtils {
   fun getDefaultInlayHintsProviderPopupActions(
@@ -150,6 +200,7 @@ object InlayHintsUtils {
   fun <Constraint : Any> produceUpdatedRootList(
     new: List<ConstrPresent<Constraint>>,
     old: List<ConstrPresent<Constraint>>,
+    comparator: Comparator<ConstrPresent<Constraint>>,
     editor: Editor,
     factory: InlayPresentationFactory
   ): List<ConstrPresent<Constraint>> {
@@ -168,16 +219,15 @@ object InlayHintsUtils {
     while (true) {
       val newEl = new[newIndex]
       val oldEl = old[oldIndex]
-      val newPriority = newEl.priority
-      val oldPriority = oldEl.priority
+      val value = comparator.compare(newEl, oldEl)
       when {
-        newPriority > oldPriority -> {
+        value > 0 -> {
           oldIndex++
           if (oldIndex == oldSize) {
             break@loop
           }
         }
-        newPriority < oldPriority -> {
+        value < 0 -> {
           updatedPresentations.add(newEl)
           newIndex++
           if (newIndex == newSize) {
@@ -220,5 +270,22 @@ object InlayHintsUtils {
     if (key != newPresentation.key) return false
     @Suppress("UNCHECKED_CAST")
     return update(newPresentation.content as Content, editor, factory)
+  }
+
+  /**
+   * Note that the range may still be invalid if document doesn't match PSI
+   */
+  fun getTextRangeWithoutLeadingCommentsAndWhitespaces(element: PsiElement): TextRange {
+    val start = SyntaxTraverser.psiApi().children(element).firstOrNull { it !is PsiComment && it !is PsiWhiteSpace } ?: element
+
+    return TextRange.create(start.startOffset, element.endOffset)
+  }
+
+  @JvmStatic
+  fun isFirstInLine(element: PsiElement): Boolean {
+    val prevSibling = element.prevSibling
+    return prevSibling is PsiWhiteSpace &&
+           (prevSibling.textContains('\n') || prevSibling.getTextRange().startOffset == 0) ||
+           element.textRange.startOffset == 0
   }
 }

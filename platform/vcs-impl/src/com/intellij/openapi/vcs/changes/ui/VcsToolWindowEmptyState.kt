@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.vcs.changes.ui
 
 import com.intellij.icons.AllIcons
@@ -31,43 +31,43 @@ import java.awt.event.InputEvent
 
 private const val ACTION_LOCAL_HISTORY = "LocalHistory.ShowHistory"
 
-internal fun StatusText.setChangesViewEmptyState(project: Project) {
+internal fun setChangesViewEmptyState(statusText: StatusText, project: Project) {
   fun invokeAction(source: Any?, actionId: String) = invokeAction(project, source, actionId, CHANGES_VIEW_EMPTY_STATE)
   fun invokeAction(source: Any?, action: AnAction) = invokeAction(project, source, action, CHANGES_VIEW_EMPTY_STATE)
 
-  appendLine(message("status.text.vcs.toolwindow"))
+  statusText.appendLine(message("status.text.vcs.toolwindow"))
   findCreateRepositoryAction()?.let { action ->
-    appendLine(message("status.text.vcs.toolwindow.create.repository"), LINK_PLAIN_ATTRIBUTES) {
+    statusText.appendLine(message("status.text.vcs.toolwindow.create.repository"), LINK_PLAIN_ATTRIBUTES) {
       invokeAction(it.source, action)
     }
   }
-  appendLine(message("status.text.vcs.toolwindow.local.history"), LINK_PLAIN_ATTRIBUTES) {
+  statusText.appendLine(message("status.text.vcs.toolwindow.local.history"), LINK_PLAIN_ATTRIBUTES) {
     invokeAction(it.source, ACTION_LOCAL_HISTORY)
   }
-  appendLine("")
-  appendLine(AllIcons.General.ContextHelp, message("status.text.vcs.toolwindow.help"), LINK_PLAIN_ATTRIBUTES) {
+  statusText.appendLine("")
+  statusText.appendLine(AllIcons.General.ContextHelp, message("status.text.vcs.toolwindow.help"), LINK_PLAIN_ATTRIBUTES) {
     invokeAction(it.source, ACTION_CONTEXT_HELP)
   }
 }
 
-internal fun StatusText.setCommitViewEmptyState(project: Project) {
+internal fun setCommitViewEmptyState(statusText: StatusText, project: Project) {
   fun invokeAction(source: Any?, actionId: String) = invokeAction(project, source, actionId, COMMIT_VIEW_EMPTY_STATE)
   fun invokeAction(source: Any?, action: AnAction) = invokeAction(project, source, action, COMMIT_VIEW_EMPTY_STATE)
 
   findCreateRepositoryAction()?.let { action ->
-    appendLine(message("status.text.commit.toolwindow.create.repository.prefix"))
+    statusText.appendLine(message("status.text.commit.toolwindow.create.repository.prefix"))
       .appendText(" ")
       .appendText(message("status.text.commit.toolwindow.create.repository"), LINK_PLAIN_ATTRIBUTES) {
         invokeAction(it.source, action)
       }
   }
-  appendLine(message("status.text.commit.toolwindow.local.history.prefix"))
+  statusText.appendLine(message("status.text.commit.toolwindow.local.history.prefix"))
     .appendText(" ")
     .appendText(message("status.text.commit.toolwindow.local.history"), LINK_PLAIN_ATTRIBUTES) {
       invokeAction(it.source, ACTION_LOCAL_HISTORY)
     }
-  appendLine("")
-  appendLine(AllIcons.General.ContextHelp, message("status.text.vcs.toolwindow.help"), LINK_PLAIN_ATTRIBUTES) {
+  statusText.appendLine("")
+  statusText.appendLine(AllIcons.General.ContextHelp, message("status.text.vcs.toolwindow.help"), LINK_PLAIN_ATTRIBUTES) {
     invokeAction(it.source, ACTION_CONTEXT_HELP)
   }
 }
@@ -78,7 +78,7 @@ internal class ActivateCommitToolWindowAction : ActivateToolWindowAction(ToolWin
     templatePresentation.icon = AllIcons.Toolwindows.ToolWindowCommit
   }
 
-  override fun hasEmptyState(): Boolean = true
+  override fun hasEmptyState(project: Project): Boolean = ChangesViewContentManager.isCommitToolWindowShown(project)
 
   override fun update(e: AnActionEvent) {
     if (e.project?.isTrusted() == false) {
@@ -99,33 +99,39 @@ private fun invokeAction(project: Project, source: Any?, actionId: String, place
   invokeAction(project, source, action, place)
 }
 
-private fun invokeAction(project: Project, source: Any?, action: AnAction, place: String) =
+private fun invokeAction(project: Project, source: Any?, action: AnAction, place: String) {
   invokeAction(action, createDataContext(project), place, source as? InputEvent, null)
+}
 
-private fun createDataContext(project: Project): DataContext =
-  SimpleDataContext.builder()
+private fun createDataContext(project: Project): DataContext {
+  return SimpleDataContext.builder()
     .add(PROJECT, project)
     .add(VIRTUAL_FILE, project.guessProjectDir())
     .add(HELP_ID, "version.control.empty.state")
     .build()
+}
 
 
-internal fun ToolWindow.hideIdLabelIfNotEmptyState() =
+internal fun ToolWindow.hideIdLabelIfNotEmptyState() {
+  fun updateIdLabel() {
+    val hideIdLabel = if (contentManager.isEmpty) null else "true"
+    if (component.getClientProperty(HIDE_ID_LABEL) != hideIdLabel) {
+      component.putClientProperty(HIDE_ID_LABEL, hideIdLabel)
+      contentManager.updateContentUi()
+    }
+  }
+
   contentManager.addContentManagerListener(object : ContentManagerListener {
     override fun contentAdded(event: ContentManagerEvent) {
-      if (contentManager.contentCount != 1) return
-
-      component.putClientProperty(HIDE_ID_LABEL, "true")
-      contentManager.updateContentUi()
+      updateIdLabel()
     }
 
     override fun contentRemoved(event: ContentManagerEvent) {
-      if (!contentManager.isEmpty) return
-
-      component.putClientProperty(HIDE_ID_LABEL, null)
-      contentManager.updateContentUi()
+      updateIdLabel()
     }
   })
+  updateIdLabel()
+}
 
 private fun ContentManager.updateContentUi() {
   if (this !is ContentManagerImpl) return

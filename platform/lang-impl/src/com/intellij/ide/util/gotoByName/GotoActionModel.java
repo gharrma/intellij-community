@@ -755,7 +755,7 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
       if (myUseListFont) {
         nameComponent.setFont(list.getFont());
       }
-      nameComponent.setBackground(bg);
+      nameComponent.setOpaque(false);
       panel.add(nameComponent, BorderLayout.CENTER);
 
       if (matchedValue instanceof String) { //...
@@ -825,8 +825,18 @@ public final class GotoActionModel implements ChooseByNameModel, Comparator<Obje
       }
       else if (value instanceof OptionDescription) {
         if (!isSelected && !(value instanceof BooleanOptionDescription)) {
-          Color descriptorBg =
-            StartupUiUtil.isUnderDarcula() ? ColorUtil.brighter(UIUtil.getListBackground(), 1) : LightColors.SLIGHTLY_GRAY;
+          Color descriptorBg;
+          if (StartupUiUtil.isUnderDarcula()) {
+            descriptorBg = ColorUtil.brighter(UIUtil.getListBackground(), 1);
+          }
+          else {
+            if (ExperimentalUI.isNewUI()) {
+              Color color = JBUI.CurrentTheme.Popup.BACKGROUND;
+              descriptorBg = ColorUtil.isDark(color) ? ColorUtil.brighter(color, 1) : ColorUtil.darker(color, 1);
+            } else {
+              descriptorBg = LightColors.SLIGHTLY_GRAY;
+            }
+          }
           panel.setBackground(descriptorBg);
           nameComponent.setBackground(descriptorBg);
         }

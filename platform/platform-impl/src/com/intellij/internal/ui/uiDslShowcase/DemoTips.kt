@@ -2,9 +2,11 @@
 package com.intellij.internal.ui.uiDslShowcase
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAwareAction
 import com.intellij.openapi.ui.DialogPanel
+import com.intellij.openapi.util.Disposer
 import com.intellij.ui.dsl.builder.*
 import com.intellij.ui.dsl.gridLayout.HorizontalAlign
 import com.intellij.util.ui.JBUI
@@ -13,8 +15,8 @@ import com.intellij.util.ui.JBUI
 @Demo(title = "Tips",
   description = "Here are some useful tips and tricks",
   scrollbar = true)
-fun demoTips(): DialogPanel {
-  return panel {
+fun demoTips(parentDisposable: Disposable): DialogPanel {
+  val panel = panel {
     row {
       label("Bold text")
         .bold()
@@ -46,7 +48,7 @@ fun demoTips(): DialogPanel {
     row {
       text("If needed text color of Row.text() can be changed to comment color with the following code:<br>" +
            "foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND<br>" +
-           "It differs from Row.comment() because comments can use smaller font size on macOS")
+           "It differs from Row.comment() because comments can use smaller font size on macOS and Linux")
         .applyToComponent { foreground = JBUI.CurrentTheme.ContextHelp.FOREGROUND }
     }
 
@@ -81,4 +83,10 @@ fun demoTips(): DialogPanel {
       }.rowComment("""Don't use row(""), because it creates unnecessary label component in layout""")
     }
   }
+
+  val disposable = Disposer.newDisposable()
+  panel.registerValidators(disposable)
+  Disposer.register(parentDisposable, disposable)
+
+  return panel
 }

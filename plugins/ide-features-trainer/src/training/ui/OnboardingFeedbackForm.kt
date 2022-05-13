@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package training.ui
 
 import com.intellij.feedback.FEEDBACK_REPORT_ID_KEY
@@ -18,6 +18,7 @@ import com.intellij.openapi.components.service
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.util.NlsContexts
+import com.intellij.openapi.util.registry.Registry
 import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeBalloonLayoutImpl
 import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame
 import com.intellij.ui.HyperlinkAdapter
@@ -153,7 +154,7 @@ fun showOnboardingLessonFeedbackForm(project: Project?,
   val technicalIssuesOption = feedbackOption("technical_issues", LearnBundle.message("onboarding.feedback.option.technical.issues"))
   val unusefulOption = feedbackOption("useless", LearnBundle.message("onboarding.feedback.option.tour.is.useless"))
   val header = JLabel(LearnBundle.message("onboarding.feedback.option.form.header")).also {
-    it.font = UISettings.instance.getFont(5).deriveFont(Font.BOLD)
+    it.font = UISettings.getInstance().getFont(5).deriveFont(Font.BOLD)
     it.border = JBUI.Borders.empty(24 - UIUtil.DEFAULT_VGAP, 0, 20 - UIUtil.DEFAULT_VGAP, 0)
   }
   val wholePanel = FormBuilder.createFormBuilder()
@@ -213,7 +214,7 @@ fun showOnboardingLessonFeedbackForm(project: Project?,
     val description = getShortDescription(likenessResult(), technicalIssuesOption, freeForm)
     submitGeneralFeedback(project, onboardingFeedbackData.reportTitle, description,
                           onboardingFeedbackData.reportTitle, jsonConverter.encodeToString(collectedData),
-                          feedbackRequestType = FeedbackRequestType.PRODUCTION_REQUEST
+                          feedbackRequestType = getFeedbackRequestType()
     )
   }
   StatisticBase.logOnboardingFeedbackDialogResult(
@@ -224,6 +225,12 @@ fun showOnboardingLessonFeedbackForm(project: Project?,
     experiencedUser = experiencedUserOption.isChosen
   )
   return maySendFeedback
+}
+
+private fun getFeedbackRequestType() = when(Registry.stringValue("ift.send.onboarding.feedback")) {
+  "production" -> FeedbackRequestType.PRODUCTION_REQUEST
+  "staging" -> FeedbackRequestType.TEST_REQUEST
+  else -> FeedbackRequestType.NO_REQUEST
 }
 
 private fun getShortDescription(likenessResult: FeedbackLikenessAnswer,
@@ -371,7 +378,7 @@ private fun createAgreementComponent(showSystemInfo: () -> Unit): JComponent {
         showSystemInfo()
       }
     })
-    editorKit = JBHtmlEditorKit()  // 213 specific change
+    editorKit = HTMLEditorKitBuilder.simple()
     text = htmlText
 
     val styleSheet = (document as HTMLDocument).styleSheet

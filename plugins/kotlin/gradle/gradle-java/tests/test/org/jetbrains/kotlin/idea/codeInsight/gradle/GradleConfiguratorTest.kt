@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.idea.codeInsight.gradle
 
@@ -24,10 +24,10 @@ import org.jetbrains.kotlin.config.KotlinCompilerVersion
 import org.jetbrains.kotlin.config.LanguageFeature
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.KotlinVersionVerbose
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinPluginLayout
 import org.jetbrains.kotlin.idea.configuration.*
 import org.jetbrains.kotlin.idea.configuration.notifications.LAST_BUNDLED_KOTLIN_COMPILER_VERSION_PROPERTY_NAME
 import org.jetbrains.kotlin.idea.configuration.notifications.checkExternalKotlinCompilerVersion
-import org.jetbrains.kotlin.idea.gradle.configuration.*
 import org.jetbrains.kotlin.idea.gradleJava.configuration.KotlinGradleModuleConfigurator
 import org.jetbrains.kotlin.idea.gradleJava.configuration.KotlinJsGradleModuleConfigurator
 import org.jetbrains.kotlin.idea.gradleJava.configuration.KotlinWithGradleConfigurator
@@ -47,7 +47,7 @@ class GradleConfiguratorTest : KotlinGradleImportingTestCase() {
         val propertyKey = LAST_BUNDLED_KOTLIN_COMPILER_VERSION_PROPERTY_NAME
         val propertiesComponent = PropertiesComponent.getInstance()
 
-        val kotlinVersionVerbose = KotlinVersionVerbose.parse(KotlinCompilerVersion.VERSION)
+        val kotlinVersionVerbose = KotlinVersionVerbose.parse(KotlinPluginLayout.instance.standaloneCompilerVersion)
         val notificationText = KotlinBundle.message(
             "kotlin.external.compiler.updates.notification.content.0",
             kotlinVersionVerbose?.plainVersion.toString(),
@@ -422,8 +422,9 @@ class GradleConfiguratorTest : KotlinGradleImportingTestCase() {
             ?: return ContainerUtil.emptyList()
         val projectPath = ExternalSystemApiUtil.getExternalProjectPath(module)
             ?: return ContainerUtil.emptyList()
-        val externalProjectInfo = ExternalSystemUtil.getExternalProjectInfo(module.project, GradleConstants.SYSTEM_ID, projectPath)
-            ?: return ContainerUtil.emptyList()
+        val externalProjectInfo =
+            ExternalSystemUtil.getExternalProjectInfo(module.project, GradleConstants.SYSTEM_ID, projectPath)
+                ?: return ContainerUtil.emptyList()
         val tasks: List<String>
         val gradlePath = GradleProjectResolverUtil.getGradlePath(module)
             ?: return ContainerUtil.emptyList()
@@ -745,7 +746,5 @@ class GradleConfiguratorTest : KotlinGradleImportingTestCase() {
     @TargetVersions("4.7+")
     fun testEnableFeatureSupportGSKWithSpecifyingPluginThroughIdAndXFlag() = testEnableFeatureSupportGSK()
 
-    override fun testDataDirName(): String {
-        return "configurator"
-    }
+    override fun testDataDirName(): String = "configurator"
 }

@@ -8,8 +8,8 @@ import com.intellij.openapi.roots.libraries.LibraryKind
 import org.jetbrains.annotations.Nls
 import org.jetbrains.kotlin.idea.KotlinJvmBundle
 import org.jetbrains.kotlin.idea.compiler.configuration.Kotlin2JvmCompilerArgumentsHolder
+import org.jetbrains.kotlin.idea.compiler.configuration.KotlinPluginLayout
 import org.jetbrains.kotlin.idea.configuration.KotlinJavaModuleConfigurator
-import org.jetbrains.kotlin.idea.versions.bundledRuntimeVersion
 import org.jetbrains.kotlin.idea.versions.getDefaultJvmTarget
 
 /**
@@ -19,14 +19,12 @@ class JavaRuntimeLibraryDescription(project: Project?) : CustomLibraryDescriptor
     project,
     KotlinJavaModuleConfigurator.NAME,
     LIBRARY_NAME,
-    DIALOG_TITLE,
-    LIBRARY_CAPTION,
     KOTLIN_JAVA_RUNTIME_KIND,
     SUITABLE_LIBRARY_KINDS
 ) {
 
     override fun configureKotlinSettings(project: Project, sdk: Sdk?) {
-        val defaultJvmTarget = getDefaultJvmTarget(sdk, bundledRuntimeVersion())
+        val defaultJvmTarget = getDefaultJvmTarget(sdk, KotlinPluginLayout.instance.ideCompilerVersion)
         if (defaultJvmTarget != null) {
             Kotlin2JvmCompilerArgumentsHolder.getInstance(project).update {
                 jvmTarget = defaultJvmTarget.description
@@ -44,9 +42,6 @@ class JavaRuntimeLibraryDescription(project: Project?) : CustomLibraryDescriptor
         val DIALOG_TITLE
             @Nls
             get() = KotlinJvmBundle.message("create.kotlin.java.runtime.library")
-        val LIBRARY_CAPTION
-            @Nls
-            get() = KotlinJvmBundle.message("kotlin.java.runtime.library")
         val SUITABLE_LIBRARY_KINDS: Set<LibraryKind> = setOf(KOTLIN_JAVA_RUNTIME_KIND)
     }
 }

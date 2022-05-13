@@ -274,7 +274,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-20770
   public void testAsyncGeneratorDunderAnext() {
-    doTest("Awaitable[int]",
+    doTest("Coroutine[Any, Any, int]",
            "async def asyncgen():\n" +
            "    yield 42\n" +
            "expr = asyncgen().__anext__()");
@@ -291,7 +291,7 @@ public class Py3TypeTest extends PyTestCase {
 
   // PY-20770
   public void testAsyncGeneratorAsend() {
-    doTest("Awaitable[int]",
+    doTest("Coroutine[Any, Any, int]",
            "async def asyncgen():\n" +
            "    yield 42\n" +
            "expr = asyncgen().asend(\"hello\")");
@@ -1323,6 +1323,46 @@ public class Py3TypeTest extends PyTestCase {
            "expr = transform(bar)");
   }
 
+  // PY-51329
+  public void testBitwiseOrOperatorOverloadUnion() {
+    doTest("UnionType",
+           "class MyMeta(type):\n" +
+           "    def __or__(self, other) -> Any:\n" +
+           "        return other\n" +
+           "\n" +
+           "class Foo(metaclass=MyMeta):\n" +
+           "    ...\n" +
+           "\n" +
+           "expr = Foo | None");
+  }
+
+  // PY-51329
+  public void testBitwiseOrOperatorOverloadUnionTypeAlias() {
+    doTest("Any",
+           "class MyMeta(type):\n" +
+           "    def __or__(self, other) -> Any:\n" +
+           "        return other\n" +
+           "\n" +
+           "class Foo(metaclass=MyMeta):\n" +
+           "    ...\n" +
+           "\n" +
+           "Alias = Foo | None\n" +
+           "expr: Alias");
+  }
+
+  // PY-51329
+  public void testBitwiseOrOperatorOverloadUnionTypeAnnotation() {
+    doTest("Any",
+           "class MyMeta(type):\n" +
+           "    def __or__(self, other) -> Any:\n" +
+           "        return other\n" +
+           "\n" +
+           "class Foo(metaclass=MyMeta):\n" +
+           "    ...\n" +
+           "\n" +
+           "expr: Foo | None");
+  }
+
   /**
    * @see #testRecursiveDictTopDown()
    * @see PyTypeCheckerInspectionTest#testRecursiveDictAttribute()
@@ -1351,6 +1391,14 @@ public class Py3TypeTest extends PyTestCase {
     assertExpressionType("dict[str, Any]", expr);
     PyExpression dict = myFixture.findElementByText("{'foo': self.foo}", PyExpression.class);
     assertExpressionType("dict[str, Any]", dict);
+  }
+
+  // PY-52656
+  public void testDictValuesType() {
+    doTest("int",
+           "d = {'foo': 42}\n" +
+           "for expr in d.values():\n" +
+           "    pass");
   }
 
   private void doTest(final String expectedType, final String text) {

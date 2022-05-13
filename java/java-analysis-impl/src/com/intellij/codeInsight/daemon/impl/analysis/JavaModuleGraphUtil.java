@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInsight.daemon.impl.analysis;
 
 import com.intellij.lang.jvm.JvmLanguage;
@@ -88,6 +88,16 @@ public final class JavaModuleGraphUtil {
         });
       }
     }
+    else {
+      root = index.getSourceRootForFile(file);
+      if (root != null) {
+        VirtualFile moduleDescriptor = root.findChild(PsiJavaModule.MODULE_INFO_FILE);
+        PsiFile psiFile = moduleDescriptor != null ? PsiManager.getInstance(project).findFile(moduleDescriptor) : null;
+        if (psiFile instanceof PsiJavaFile) {
+          return ((PsiJavaFile)psiFile).getModuleDeclaration();
+        }
+      }
+    }
 
     return null;
   }
@@ -115,8 +125,8 @@ public final class JavaModuleGraphUtil {
     Project project = module.getProject();
     GlobalSearchScope moduleScope = module.getModuleScope();
     if (!DumbService.isDumb(project) &&
-        FilenameIndex.getFilesByName(project, PsiJavaModule.MODULE_INFO_FILE, moduleScope).length == 0 &&
-        FilenameIndex.getFilesByName(project, JarFile.MANIFEST_NAME, moduleScope).length == 0) {
+        FilenameIndex.getVirtualFilesByName(PsiJavaModule.MODULE_INFO_FILE, moduleScope).isEmpty() &&
+        FilenameIndex.getVirtualFilesByName("MANIFEST.MF", moduleScope).isEmpty()) {
       return null;
     }
     JavaSourceRootType rootType = inTests ? JavaSourceRootType.TEST_SOURCE : JavaSourceRootType.SOURCE;
@@ -318,7 +328,10 @@ public final class JavaModuleGraphUtil {
       Map<String, PsiJavaModule> exports = new HashMap<>();
       return processExports(source, (pkg, m) -> {
         PsiJavaModule found = exports.put(pkg, m);
-        return found == null || found instanceof LightJavaModule && m instanceof LightJavaModule ? null : new Trinity<>(pkg, found, m);
+        return found == null ||
+               found instanceof LightJavaModule && m instanceof LightJavaModule ||
+               found.getName().equals(m.getName())
+               ? null : new Trinity<>(pkg, found, m);
       });
     }
 

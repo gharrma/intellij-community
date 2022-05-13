@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package org.jetbrains.plugins.groovy.config;
 
 import com.intellij.openapi.module.Module;
@@ -42,14 +42,6 @@ public final class GroovyConfigUtils extends AbstractConfigUtils {
   @NlsSafe public static final String GROOVY3_0 = "3.0";
   @NlsSafe public static final String GROOVY4_0 = "4.0";
 
-  /**
-   * @deprecated At the time of writing, the latest version of Groovy 4 is beta-1,
-   * and we need to restrict features of beta-2 from their instant usage.
-   * We should remove dependency on unstable version when groovy 4 gets fully released
-   */
-  @Deprecated(since = "2022.1", forRemoval = true)
-  @NlsSafe public static final String GROOVY4_0_BETA_2 = "4.0.0-beta-2";
-
   private static final GroovyConfigUtils ourGroovyConfigUtils = new GroovyConfigUtils();
   @NonNls private static final String LIB = "/lib";
   @NonNls private static final String EMBEDDABLE = "/embeddable";
@@ -80,6 +72,15 @@ public final class GroovyConfigUtils extends AbstractConfigUtils {
 
   public static boolean isAtLeastGroovy40(@NotNull PsiElement element) {
     return getInstance().isVersionAtLeast(element, GROOVY4_0);
+  }
+
+  public static @NlsSafe String getMavenSdkRepository(@NotNull String groovyVersion) {
+    if (compareSdkVersions(groovyVersion, GROOVY4_0) >= 0) {
+      return "org.apache.groovy";
+    }
+    else {
+      return "org.codehaus.groovy";
+    }
   }
 
   @Override
@@ -178,15 +179,11 @@ public final class GroovyConfigUtils extends AbstractConfigUtils {
   public boolean isSDKHome(VirtualFile file) {
     if (file != null && file.isDirectory()) {
       final String path = file.getPath();
-      if (LibrariesUtil.getFilesInDirectoryByPattern(path + LIB, GROOVY_JAR_PATTERN).length > 0 ||
-          LibrariesUtil.getFilesInDirectoryByPattern(path + EMBEDDABLE, GROOVY_ALL_JAR_PATTERN).length > 0 ||
-          LibrariesUtil.getFilesInDirectoryByPattern(path, GROOVY_JAR_PATTERN).length > 0) {
-        return true;
-      }
+      GroovyHomeKind kind = GroovyHomeKind.fromString(path);
+      return kind != null;
     }
     return false;
   }
-
 
   @NotNull
   public String getSDKLibVersion(Library library) {

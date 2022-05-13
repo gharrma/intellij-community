@@ -63,17 +63,17 @@ public class PlatformUndoTest extends LightPlatformTestCase {
     private final VirtualFile myFile;
     private final Document[] myDocuments;
 
-    private IncorrectFileEditor(VirtualFile file, Document... documents) {
+    private IncorrectFileEditor(VirtualFile file, @NotNull Document @NotNull ... documents) {
       myFile = file;
       myDocuments = documents;
     }
 
     @Override
-    public VirtualFile getFile() {
+    public @NotNull VirtualFile getFile() {
       return myFile;
     }
     @Override
-    public Document @NotNull [] getDocuments() {
+    public @NotNull Document @NotNull [] getDocuments() {
       return myDocuments;
     }
 

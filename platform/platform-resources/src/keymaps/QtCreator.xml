@@ -33,7 +33,7 @@
     <keyboard-shortcut first-keystroke="control Y"/>
   </action>
   <action id="ParameterInfo"/>
-  <action id="FileChooser.TogglePathShowing"/>
+  <action id="FileChooser.TogglePathBar"/>
   <action id="Print">
     <keyboard-shortcut first-keystroke="control P"/>
   </action>
@@ -275,6 +275,9 @@
   </action>
   <action id="FindWordAtCaret">
     <keyboard-shortcut first-keystroke="control F3"/>
+  </action>
+  <action id="FindPrevWordAtCaret">
+    <keyboard-shortcut first-keystroke="control shift F3"/>
   </action>
   <action id="FindInPath">
     <keyboard-shortcut first-keystroke="control shift F"/>

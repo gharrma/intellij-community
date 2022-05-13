@@ -20,6 +20,7 @@ import com.intellij.openapi.vfs.VirtualFile;
 import com.intellij.util.DocumentUtil;
 import com.intellij.util.ObjectUtils;
 import com.intellij.util.diff.FilesTooBigForDiffException;
+import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NonNls;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -34,18 +35,20 @@ public class RangeMarkerImpl extends UserDataHolderBase implements RangeMarkerEx
   private final long myId;
   private static final StripedIDGenerator counter = new StripedIDGenerator();
 
-  RangeMarkerImpl(@NotNull DocumentEx document, int start, int end, boolean register, boolean forceDocumentStrongReference) {
+  @ApiStatus.Internal
+  public RangeMarkerImpl(@NotNull DocumentEx document, int start, int end, boolean register, boolean forceDocumentStrongReference) {
     this(forceDocumentStrongReference ? document : ObjectUtils.notNull(FileDocumentManager.getInstance().getFile(document), document),
          document.getTextLength(), start, end, register, false, false);
   }
 
   // constructor which creates marker without document and saves it in the virtual file directly. Can be cheaper than loading document.
-  RangeMarkerImpl(@NotNull VirtualFile virtualFile, int start, int end, boolean register) {
+  RangeMarkerImpl(@NotNull VirtualFile virtualFile, int start, int end, int estimatedDocumentLength, boolean register) {
     // unfortunately we don't know the exact document size until we load it
-    this(virtualFile, estimateDocumentLength(virtualFile), start, end, register, false, false);
+    this(virtualFile, estimatedDocumentLength, start, end, register, false, false);
   }
 
-  private RangeMarkerImpl(@NotNull Object documentOrFile, int documentTextLength,
+  private RangeMarkerImpl(@NotNull Object documentOrFile,
+                          int documentTextLength,
                           int start,
                           int end,
                           boolean register,
@@ -57,7 +60,7 @@ public class RangeMarkerImpl extends UserDataHolderBase implements RangeMarkerEx
     if (end > documentTextLength) {
       throw new IllegalArgumentException("Wrong end: " + end + "; document length=" + documentTextLength + "; start=" + start);
     }
-    if (start > end){
+    if (start > end) {
       throw new IllegalArgumentException("start > end: start=" + start+"; end="+end);
     }
 
@@ -68,9 +71,9 @@ public class RangeMarkerImpl extends UserDataHolderBase implements RangeMarkerEx
     }
   }
 
-  private static int estimateDocumentLength(@NotNull VirtualFile virtualFile) {
+  static int estimateDocumentLength(@NotNull VirtualFile virtualFile) {
     Document document = FileDocumentManager.getInstance().getCachedDocument(virtualFile);
-    return document == null ? Integer.MAX_VALUE : document.getTextLength();
+    return document == null ? (int)virtualFile.getLength() : document.getTextLength();
   }
 
   protected void registerInTree(int start, int end, boolean greedyToLeft, boolean greedyToRight, int layer) {

@@ -38,6 +38,7 @@ import org.jetbrains.annotations.*;
 import javax.swing.*;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -209,6 +210,11 @@ public class VcsUtil {
   }
 
   @NotNull
+  public static FilePath getFilePath(@NotNull Path path, boolean isDirectory) {
+    return VcsContextFactory.SERVICE.getInstance().createFilePath(path, isDirectory);
+  }
+
+  @NotNull
   public static FilePath getFilePath(@NotNull @NonNls String path, boolean isDirectory) {
     return VcsContextFactory.SERVICE.getInstance().createFilePath(path, isDirectory);
   }
@@ -226,8 +232,7 @@ public class VcsUtil {
   /**
    * @deprecated use {@link #getFilePath(String, boolean)}
    */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval(inVersion = "2021.3")
+  @Deprecated(forRemoval = true)
   public static @NotNull FilePath getFilePathForDeletedFile(@NotNull @NonNls String path, boolean isDirectory) {
     return VcsContextFactory.SERVICE.getInstance().createFilePath(path, isDirectory);
   }
@@ -254,8 +259,7 @@ public class VcsUtil {
   /**
    * @deprecated use {@link StatusBar.Info#set(String, Project)} directly.
    */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval(inVersion = "2021.3")
+  @Deprecated(forRemoval = true)
   public static void showStatusMessage(@NotNull Project project, @Nullable @Nls String message) {
     SwingUtilities.invokeLater(() -> {
       if (project.isOpen()) {
@@ -347,8 +351,7 @@ public class VcsUtil {
    * @deprecated Use {@link ProgressManager#runProcessWithProgressSynchronously(ThrowableComputable, String, boolean, Project)}
    * and other run methods from the ProgressManager.
    */
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval(inVersion = "2021.3")
+  @Deprecated(forRemoval = true)
   public static boolean runVcsProcessWithProgress(@NotNull VcsRunnable runnable,
                                                   @NotNull @NlsContexts.ProgressTitle String progressTitle,
                                                   boolean canBeCanceled,
@@ -538,10 +541,17 @@ public class VcsUtil {
       }
       else if (FileUtil.pathsEqual(mapping.getDirectory(), newMapping.getDirectory())) {
         if (!StringUtil.isEmptyOrSpaces(mapping.getVcs())) {
-          LOG.warn("Substituting existing mapping [" + mapping.getDirectory() + "] -> [" + mapping.getVcs() + "] with [" + mapping.getVcs() + "]");
+          if (mapping.getVcs().equals(newMapping.getVcs())) {
+            LOG.debug(String.format("Substituting existing mapping with identical [%s] -> [%s]",
+                                    mapping.getDirectory(), mapping.getVcs()));
+          }
+          else {
+            LOG.warn(String.format("Substituting existing mapping [%s] -> [%s] with [%s]",
+                                   mapping.getDirectory(), mapping.getVcs(), newMapping.getVcs()));
+          }
         }
         else {
-          LOG.debug("Removing [" + mapping.getDirectory() + "] -> <None> mapping");
+          LOG.debug(String.format("Removing [%s] -> <None> mapping", mapping.getDirectory()));
         }
         iterator.remove();
       }

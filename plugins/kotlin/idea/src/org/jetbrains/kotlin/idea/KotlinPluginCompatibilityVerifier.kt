@@ -23,7 +23,7 @@ object KotlinPluginCompatibilityVerifier {
 data class KotlinVersionVerbose(val plainVersion: KotlinVersion, val milestone: KotlinVersionMilestone?, val buildNumber: Int?) {
     @Suppress("EnumEntryName")
     enum class KotlinVersionMilestone {
-        dev, M1, M2, RC, RC2, release;
+        SNAPSHOT, dev, M1, M2, RC, RC2, release;
     }
 
     companion object {
@@ -47,12 +47,9 @@ data class KotlinVersionVerbose(val plainVersion: KotlinVersion, val milestone: 
             patch: String,
             milestone: String?,
             buildNumber: String?
-        ): KotlinVersionVerbose? {
+        ): KotlinVersionVerbose {
             val enumMilestone = KotlinVersionMilestone.values().singleOrNull { it.name.equals(milestone, ignoreCase = true) }
             val intBuildNumber = buildNumber?.toIntOrNull()
-            if (intBuildNumber != null && enumMilestone == null) {
-                return null
-            }
             return KotlinVersionVerbose(KotlinVersion(major.toInt(), minor.toInt(), patch.toInt()), enumMilestone, intBuildNumber)
         }
     }

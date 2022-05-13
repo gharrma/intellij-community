@@ -36,7 +36,6 @@ import com.intellij.util.containers.FileCollectionFactory;
 import com.intellij.util.messages.MessageBus;
 import com.intellij.util.messages.MessageBusConnection;
 import com.intellij.util.net.NetUtils;
-import org.jetbrains.annotations.ApiStatus;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.jetbrains.annotations.TestOnly;
@@ -46,7 +45,8 @@ import org.jetbrains.jps.incremental.BinaryContent;
 import org.jetbrains.jps.javac.*;
 import org.jetbrains.jps.javac.ast.api.JavacFileData;
 
-import javax.tools.*;
+import javax.tools.Diagnostic;
+import javax.tools.JavaFileObject;
 import java.io.File;
 import java.io.IOException;
 import java.net.URI;
@@ -79,8 +79,7 @@ public class CompilerManagerImpl extends CompilerManager {
   private volatile ExternalJavacManager myExternalJavacManager;
 
   @NonInjectable
-  @Deprecated
-  @ApiStatus.ScheduledForRemoval(inVersion = "2021.3")
+  @Deprecated(forRemoval = true)
   public CompilerManagerImpl(@NotNull Project project, @NotNull MessageBus messageBus) {
     this(project);
   }
@@ -365,18 +364,8 @@ public class CompilerManagerImpl extends CompilerManager {
   }
 
   @Override
-  public @NotNull CompileScope createModuleCompileScope(final @NotNull Module module, final boolean includeDependentModules) {
-    return createModulesCompileScope(new Module[] {module}, includeDependentModules);
-  }
-
-  @Override
-  public @NotNull CompileScope createModulesCompileScope(final Module @NotNull [] modules, final boolean includeDependentModules) {
-    return createModulesCompileScope(modules, includeDependentModules, false);
-  }
-
-  @Override
-  public @NotNull CompileScope createModulesCompileScope(Module @NotNull [] modules, boolean includeDependentModules, boolean includeRuntimeDependencies) {
-    return new ModuleCompileScope(myProject, modules, includeDependentModules, includeRuntimeDependencies);
+  public @NotNull CompileScope createModulesCompileScope(Module @NotNull [] modules, boolean includeDependentModules, boolean includeRuntimeDependencies, boolean includeTests) {
+    return new ModuleCompileScope(myProject, Arrays.asList(modules), Collections.emptyList(), includeDependentModules, includeRuntimeDependencies, includeTests);
   }
 
   @Override

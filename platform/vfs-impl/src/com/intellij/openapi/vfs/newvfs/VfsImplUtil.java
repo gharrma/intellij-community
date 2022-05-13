@@ -141,18 +141,18 @@ public final class VfsImplUtil {
       return null;
     }
 
-    String basePath = vfs.extractRootPath(normalizedPath);
-    if (basePath.isBlank() || basePath.length() > normalizedPath.length()) {
-      LOG.warn(vfs + " has extracted incorrect root '" + basePath + "' from '" + normalizedPath + "' (original '" + path + "')");
+    String rootPath = vfs.extractRootPath(normalizedPath);
+    if (rootPath.isBlank() || rootPath.length() > normalizedPath.length()) {
+      LOG.warn(vfs + " has extracted incorrect root '" + rootPath + "' from '" + normalizedPath + "' (original '" + path + "')");
       return null;
     }
 
-    NewVirtualFile root = ManagingFS.getInstance().findRoot(basePath, vfs);
+    NewVirtualFile root = ManagingFS.getInstance().findRoot(rootPath, vfs);
     if (root == null || !root.exists()) {
       return null;
     }
 
-    return pair(root, normalizedPath.substring(basePath.length()));
+    return pair(root, normalizedPath.substring(rootPath.length()));
   }
 
   public static void refresh(@NotNull NewVirtualFileSystem vfs, boolean asynchronous) {
@@ -187,10 +187,15 @@ public final class VfsImplUtil {
   private static final Map<String, Pair<ArchiveFileSystem, ArchiveHandler>> ourHandlerCache = CollectionFactory.createFilePathMap(); // guarded by ourLock
   private static final Map<String, Set<String>> ourDominatorsMap = CollectionFactory.createFilePathMap(); // guarded by ourLock; values too
 
+  @ApiStatus.Internal
+  public static @NotNull String getLocalPath(@NotNull ArchiveFileSystem vfs, @NotNull String entryPath) {
+    return vfs.extractLocalPath(entryPath);
+  }
+
   public static @NotNull <T extends ArchiveHandler> T getHandler(@NotNull ArchiveFileSystem vfs,
                                                                  @NotNull VirtualFile entryFile,
                                                                  @NotNull Function<? super String, ? extends T> producer) {
-    String localPath = vfs.extractLocalPath(VfsUtilCore.getRootFile(entryFile).getPath());
+    String localPath = getLocalPath(vfs, VfsUtilCore.getRootFile(entryFile).getPath());
     checkSubscription();
 
     T handler;
@@ -393,7 +398,7 @@ public final class VfsImplUtil {
     VirtualFile local = null;
     if (entryFileSystem instanceof ArchiveFileSystem) {
       local = ((ArchiveFileSystem)entryFileSystem).getLocalByEntry(file);
-      path = local == null ? ((ArchiveFileSystem)entryFileSystem).extractLocalPath(path) : local.getPath();
+      path = local == null ? getLocalPath((ArchiveFileSystem)entryFileSystem, path) : local.getPath();
     }
     String[] jarPaths;
     synchronized (ourLock) {

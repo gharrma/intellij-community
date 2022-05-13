@@ -3,96 +3,53 @@
 
 package com.intellij.openapi.roots.ui
 
-import com.intellij.openapi.actionSystem.KeyboardShortcut
-import com.intellij.openapi.keymap.KeymapManager
-import com.intellij.openapi.keymap.KeymapUtil
+import com.intellij.openapi.ui.isTextUnderMouse as isTextUnderMouseImpl
+import com.intellij.openapi.ui.getActionShortcutText as getActionShortcutTextImpl
+import com.intellij.openapi.ui.getKeyStrokes as getKeyStrokesImpl
+import com.intellij.openapi.ui.removeKeyboardAction as removeKeyboardActionImpl
+import com.intellij.openapi.ui.addKeyboardAction as addKeyboardActionImpl
+import com.intellij.openapi.observable.util.whenItemSelected as whenItemSelectedImpl
+import com.intellij.openapi.observable.util.whenTextChanged as whenTextModifiedImpl
+import com.intellij.openapi.observable.util.whenFocusGained as whenFocusGainedImpl
+import com.intellij.openapi.observable.util.onceWhenFocusGained as whenFirstFocusGainedImpl
 import com.intellij.openapi.ui.ComboBox
-import com.intellij.ui.DocumentAdapter
+import org.jetbrains.annotations.ApiStatus
 import java.awt.event.*
-import javax.swing.InputMap
 import javax.swing.JComponent
 import javax.swing.KeyStroke
-import javax.swing.event.DocumentEvent
 import javax.swing.text.JTextComponent
 
-
-fun JTextComponent.isTextUnderMouse(e: MouseEvent): Boolean {
-  val position = viewToModel2D(e.point)
-  return position in 1 until text.length
-}
-
-fun getActionShortcutText(actionId: String): String {
-  val keymapManager = KeymapManager.getInstance()
-  val activeKeymap = keymapManager.activeKeymap
-  val shortcuts = activeKeymap.getShortcuts(actionId)
-  return KeymapUtil.getShortcutsText(shortcuts)
-}
-
-fun getKeyStrokes(vararg actionIds: String): List<KeyStroke> {
-  val keymapManager = KeymapManager.getInstance()
-  val activeKeymap = keymapManager.activeKeymap
-  return actionIds.asSequence()
-    .flatMap { activeKeymap.getShortcuts(it).asSequence() }
-    .filterIsInstance<KeyboardShortcut>()
-    .flatMap { sequenceOf(it.firstKeyStroke, it.secondKeyStroke) }
-    .filterNotNull()
-    .toList()
-}
-
-fun JComponent.removeKeyboardAction(vararg keyStrokes: KeyStroke) {
-  removeKeyboardAction(keyStrokes.toList())
-}
-
-fun JComponent.removeKeyboardAction(keyStrokes: List<KeyStroke>) {
-  var map: InputMap? = inputMap
-  while (map != null) {
-    for (keyStroke in keyStrokes) {
-      map.remove(keyStroke)
-    }
-    map = map.parent
-  }
-}
-
-fun JComponent.addKeyboardAction(vararg keyStrokes: KeyStroke, action: (ActionEvent) -> Unit) {
-  addKeyboardAction(keyStrokes.toList(), action)
-}
-
-fun JComponent.addKeyboardAction(keyStrokes: List<KeyStroke>, action: (ActionEvent) -> Unit) {
-  for (keyStroke in keyStrokes) {
-    registerKeyboardAction(action, keyStroke, JComponent.WHEN_FOCUSED)
-  }
-}
-
-fun <E> ComboBox<E>.whenItemSelected(listener: (E) -> Unit) {
-  addItemListener {
-    if (it.stateChange == ItemEvent.SELECTED) {
-      @Suppress("UNCHECKED_CAST")
-      listener(it.item as E)
-    }
-  }
-}
-
-fun JTextComponent.whenTextModified(listener: () -> Unit) {
-  document.addDocumentListener(object : DocumentAdapter() {
-    override fun textChanged(e: DocumentEvent) {
-      listener()
-    }
-  })
-}
-
-fun JComponent.whenFocusGained(listener: () -> Unit) {
-  addFocusListener(object : FocusAdapter() {
-    override fun focusGained(e: FocusEvent) {
-      listener()
-    }
-  })
-}
-
-fun JComponent.whenFirstFocusGained(listener: () -> Unit) {
-  addFocusListener(object : FocusAdapter() {
-    override fun focusGained(e: FocusEvent) {
-      removeFocusListener(this)
-      listener()
-    }
-  })
-}
+//@formatter:off
+@Deprecated("Use function from platform API", ReplaceWith("isTextUnderMouse(e)", "com.intellij.openapi.ui.isTextUnderMouse"))
+@ApiStatus.ScheduledForRemoval
+fun JTextComponent.isTextUnderMouse(e: MouseEvent) = isTextUnderMouseImpl(e)
+@Deprecated("Use function from platform API", ReplaceWith("getActionShortcutText(actionId)", "com.intellij.openapi.ui.getActionShortcutText"))
+@ApiStatus.ScheduledForRemoval
+fun getActionShortcutText(actionId: String) = getActionShortcutTextImpl(actionId)
+@Deprecated("Use function from platform API", ReplaceWith("getKeyStrokes(*actionIds)", "com.intellij.openapi.ui.getKeyStrokes"))
+@ApiStatus.ScheduledForRemoval
+fun getKeyStrokes(vararg actionIds: String) = getKeyStrokesImpl(*actionIds)
+@Deprecated("Use function from platform API", ReplaceWith("removeKeyboardAction(*keyStrokes)", "com.intellij.openapi.ui.removeKeyboardAction"))
+@ApiStatus.ScheduledForRemoval
+fun JComponent.removeKeyboardAction(vararg keyStrokes: KeyStroke) = removeKeyboardActionImpl(*keyStrokes)
+@Deprecated("Use function from platform API", ReplaceWith("removeKeyboardAction(keyStrokes)", "com.intellij.openapi.ui.removeKeyboardAction"))
+@ApiStatus.ScheduledForRemoval
+fun JComponent.removeKeyboardAction(keyStrokes: List<KeyStroke>) = removeKeyboardActionImpl(keyStrokes)
+@Deprecated("Use function from platform API", ReplaceWith("addKeyboardAction(*keyStrokes) { action(it) }", "com.intellij.openapi.ui.addKeyboardAction"))
+@ApiStatus.ScheduledForRemoval
+fun JComponent.addKeyboardAction(vararg keyStrokes: KeyStroke, action: (ActionEvent) -> Unit) = addKeyboardActionImpl(*keyStrokes) { action(it) }
+@Deprecated("Use function from platform API", ReplaceWith("addKeyboardAction(keyStrokes, action)", "com.intellij.openapi.ui.addKeyboardAction"))
+@ApiStatus.ScheduledForRemoval
+fun JComponent.addKeyboardAction(keyStrokes: List<KeyStroke>, action: (ActionEvent) -> Unit) = addKeyboardActionImpl(keyStrokes, action)
+@Deprecated("Use function from platform API", ReplaceWith("whenItemSelected(listener)", "com.intellij.openapi.observable.util.whenItemSelected"))
+@ApiStatus.ScheduledForRemoval
+fun <E> ComboBox<E>.whenItemSelected(listener: (E) -> Unit) = whenItemSelectedImpl(listener = listener)
+@Deprecated("Use function from platform API", ReplaceWith("whenTextChanged { listener() }", "com.intellij.openapi.observable.util.whenTextChanged"))
+@ApiStatus.ScheduledForRemoval
+fun JTextComponent.whenTextModified(listener: () -> Unit) = whenTextModifiedImpl { listener() }
+@Deprecated("Use function from platform API", ReplaceWith("whenFocusGained { listener() }", "com.intellij.openapi.observable.util.whenFocusGained"))
+@ApiStatus.ScheduledForRemoval
+fun JComponent.whenFocusGained(listener: () -> Unit) = whenFocusGainedImpl { listener() }
+@Deprecated("Use function from platform API", ReplaceWith("onceWhenFocusGained { listener() }", "com.intellij.openapi.observable.util.onceWhenFocusGained"))
+@ApiStatus.ScheduledForRemoval
+fun JComponent.whenFirstFocusGained(listener: () -> Unit) = whenFirstFocusGainedImpl { listener() }

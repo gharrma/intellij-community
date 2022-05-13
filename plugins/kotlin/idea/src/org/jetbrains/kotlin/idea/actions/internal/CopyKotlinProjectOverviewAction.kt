@@ -15,9 +15,6 @@ import com.intellij.openapi.project.Project
 import com.intellij.util.ui.EmptyClipboardOwner
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.KotlinPluginUtil
-import org.jetbrains.kotlin.idea.configuration.*
-import org.jetbrains.kotlin.idea.util.application.isApplicationInternalMode
-import org.jetbrains.kotlin.idea.util.buildNumber
 import org.jetbrains.kotlin.idea.configuration.findExternalKotlinCompilerVersion
 import org.jetbrains.kotlin.idea.configuration.getBuildSystemType
 import org.jetbrains.kotlin.idea.configuration.hasKotlinFilesInSources
@@ -78,8 +75,8 @@ class CopyKotlinProjectOverviewAction : AnAction() {
             for (module in modules) {
                 yield(
                     when {
-                        hasKotlinFilesInSources(module) -> "In Sources"
-                        hasKotlinFilesOnlyInTests(module) -> "In Tests"
+                        hasKotlinFilesInSources(module) -> "Sources of [${module.name}]"
+                        hasKotlinFilesOnlyInTests(module) -> "Test sources of [${module.name}]"
                         else -> null
                     }
                 )

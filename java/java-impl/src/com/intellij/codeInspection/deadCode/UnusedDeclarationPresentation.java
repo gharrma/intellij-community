@@ -14,6 +14,7 @@ import com.intellij.concurrency.ConcurrentCollectionFactory;
 import com.intellij.icons.AllIcons;
 import com.intellij.ide.util.PsiNavigationSupport;
 import com.intellij.lang.annotation.HighlightSeverity;
+import com.intellij.lang.java.JavaLanguage;
 import com.intellij.openapi.actionSystem.ActionManager;
 import com.intellij.openapi.actionSystem.AnActionEvent;
 import com.intellij.openapi.application.ApplicationManager;
@@ -412,7 +413,7 @@ public class UnusedDeclarationPresentation extends DefaultInspectionToolPresenta
 
   @Override
   public boolean isProblemResolved(@Nullable RefEntity entity) {
-    return myFixedElements.containsKey(entity);
+    return entity != null && myFixedElements.containsKey(entity);
   }
 
   @Override
@@ -429,6 +430,8 @@ public class UnusedDeclarationPresentation extends DefaultInspectionToolPresenta
               (myFixedElements.containsKey(refElement) ||
               isExcluded(refEntity) ||
               isSuppressed(refElement))) && refElement.isValid() && getFilter().accepts(refElement)) {
+          PsiElement psiElement = refElement.getPsiElement();
+          if (psiElement != null && psiElement.getLanguage() != JavaLanguage.INSTANCE) return;
           if (skipEntryPoints(refElement)) return;
           registerContentEntry(refEntity, RefJavaUtil.getInstance().getPackageName(refEntity));
         }
@@ -647,7 +650,8 @@ public class UnusedDeclarationPresentation extends DefaultInspectionToolPresenta
     @Nullable
     @Override
     public String getTailText() {
-      final UnusedDeclarationHint hint = ((UnusedDeclarationPresentation)getPresentation()).myFixedElements.get(getElement());
+      RefEntity element = getElement();
+      final UnusedDeclarationHint hint = element == null ? null : ((UnusedDeclarationPresentation)getPresentation()).myFixedElements.get(element);
       if (hint != null) {
         return hint.getDescription();
       }
@@ -656,7 +660,8 @@ public class UnusedDeclarationPresentation extends DefaultInspectionToolPresenta
 
     @Override
     public boolean isQuickFixAppliedFromView() {
-      return ((UnusedDeclarationPresentation)getPresentation()).myFixedElements.containsKey(getElement());
+      RefEntity element = getElement();
+      return element != null && ((UnusedDeclarationPresentation)getPresentation()).myFixedElements.containsKey(element);
     }
 
     @Override

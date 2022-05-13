@@ -406,6 +406,35 @@ public final class Maven2ServerEmbedderImpl extends MavenRemoteObject implements
   }
 
   @NotNull
+  @Override
+  public MavenArtifactResolveResult resolveArtifactTransitively(@NotNull List<MavenArtifactInfo> artifacts,
+                                                                @NotNull List<MavenRemoteRepository> remoteRepositories,
+                                                                MavenToken token) throws RemoteException {
+    MavenServerUtil.checkToken(token);
+    try {
+      Set<Artifact> toResolve = new LinkedHashSet<Artifact>();
+      for (MavenArtifactInfo each : artifacts) {
+        toResolve.add(createArtifact(each));
+      }
+
+      return new MavenArtifactResolveResult(
+        Maven2ModelConverter.convertArtifacts(myImpl.resolveTransitively(toResolve, convertRepositories(remoteRepositories)),
+                                                   new HashMap<Artifact, MavenArtifact>(), getLocalRepositoryFile())
+        , null);
+    }
+    catch (ArtifactResolutionException e) {
+      Maven2ServerGlobals.getLogger().info(e);
+    }
+    catch (ArtifactNotFoundException e) {
+      Maven2ServerGlobals.getLogger().info(e);
+    }
+    catch (Exception e) {
+      throw rethrowException(e);
+    }
+    return new MavenArtifactResolveResult(Collections.<MavenArtifact>emptyList(), null);
+  }
+
+  @NotNull
   private MavenArtifact doResolve(MavenArtifactInfo info, List<MavenRemoteRepository> remoteRepositories) throws RemoteException {
     Artifact resolved = doResolve(createArtifact(info), convertRepositories(remoteRepositories));
     return Maven2ModelConverter.convertArtifact(resolved, getLocalRepositoryFile());
@@ -766,6 +795,37 @@ public final class Maven2ServerEmbedderImpl extends MavenRemoteObject implements
     catch (Exception e) {
       throw rethrowException(e);
     }
+  }
+
+  @Override
+  public Set<MavenRemoteRepository> resolveRepositories(@NotNull Collection<MavenRemoteRepository> repositories,
+                                                         MavenToken token) throws RemoteException {
+    return Collections.emptySet();
+  }
+
+  @Override
+  public Collection<MavenArchetype> getArchetypes(MavenToken token) throws RemoteException {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public Collection<MavenArchetype> getLocalArchetypes(MavenToken token, @NotNull String path) throws RemoteException {
+    return Collections.emptyList();
+  }
+
+  @Override
+  public Collection<MavenArchetype> getRemoteArchetypes(MavenToken token, @NotNull String url) throws RemoteException {
+    return Collections.emptyList();
+  }
+
+  @Nullable
+  @Override
+  public Map<String, String> resolveAndGetArchetypeDescriptor(@NotNull String groupId,
+                                                              @NotNull String artifactId,
+                                                              @NotNull String version,
+                                                              @NotNull List<MavenRemoteRepository> repositories,
+                                                              @Nullable String url, MavenToken token) throws RemoteException {
+    return Collections.emptyMap();
   }
 
   private interface Executor<T> {

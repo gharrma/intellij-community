@@ -6,7 +6,6 @@ import com.intellij.util.containers.Stack
 import org.jetbrains.kotlin.codeMetaInfo.model.CodeMetaInfo
 import org.jetbrains.kotlin.idea.codeMetaInfo.CodeMetaInfoParser
 import java.io.File
-import java.lang.StringBuilder
 
 object CodeMetaInfoRenderer {
     fun renderTagsToText(codeMetaInfos: List<CodeMetaInfo>, originalText: String): StringBuilder {

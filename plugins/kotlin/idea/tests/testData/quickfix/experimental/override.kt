@@ -1,6 +1,6 @@
 // "Propagate 'MyExperimentalAPI' opt-in requirement to containing class 'Derived'" "false"
 // COMPILER_ARGUMENTS: -opt-in=kotlin.RequiresOptIn
-// WITH_RUNTIME
+// WITH_STDLIB
 // ACTION: Propagate 'MyExperimentalAPI' opt-in requirement to 'foo'
 // ACTION: Opt in for 'MyExperimentalAPI' in containing file 'override.kt'
 // ACTION: Opt in for 'MyExperimentalAPI' on 'foo'

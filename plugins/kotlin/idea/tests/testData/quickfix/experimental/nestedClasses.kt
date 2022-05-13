@@ -1,6 +1,6 @@
 // "Propagate 'MyExperimentalAPI' opt-in requirement to containing class 'Outer'" "false"
 // COMPILER_ARGUMENTS: -opt-in=kotlin.RequiresOptIn
-// WITH_RUNTIME
+// WITH_STDLIB
 // ACTION: Propagate 'MyExperimentalAPI' opt-in requirement to 'bar'
 // ACTION: Propagate 'MyExperimentalAPI' opt-in requirement to containing class 'Inner'
 // ACTION: Opt in for 'MyExperimentalAPI' on 'bar'

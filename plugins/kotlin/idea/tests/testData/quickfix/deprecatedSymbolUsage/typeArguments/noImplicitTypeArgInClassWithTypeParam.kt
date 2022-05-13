@@ -1,5 +1,5 @@
 // "Replace with 'this.minByOrNull(selector)'" "true"
-// WITH_RUNTIME
+// WITH_STDLIB
 // LANGUAGE_VERSION: 1.5
 class C<T> {
     fun test() {

@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.renderer.DescriptorRenderer
 import org.jetbrains.kotlin.resolve.calls.util.getResolvedCall
 import org.jetbrains.kotlin.resolve.descriptorUtil.fqNameSafe
 import org.jetbrains.kotlin.resolve.lazy.BodyResolveMode
+import org.jetbrains.kotlin.resolve.scopes.receivers.ReceiverValue
 import org.jetbrains.kotlin.types.FlexibleType
 import org.jetbrains.kotlin.types.KotlinType
 
@@ -30,6 +31,26 @@ object KotlinPsiUtil {
 }
 
 fun KtCallExpression.callName(): String = this.calleeExpression!!.text
+
+// Used in JAICF plugin (https://plugins.jetbrains.com/plugin/17391-jaicf/)
+@Deprecated(
+    "Function is semantically incorrect as there might be both dispatch and extension receivers. Replace call with appropriate logic.",
+    level = DeprecationLevel.ERROR
+)
+fun KtCallExpression.receiverValue(): ReceiverValue? {
+    val resolvedCall = getResolvedCall(analyze(BodyResolveMode.PARTIAL)) ?: return null
+    return resolvedCall.dispatchReceiver ?: resolvedCall.extensionReceiver
+}
+
+// Used in JAICF plugin (https://plugins.jetbrains.com/plugin/17391-jaicf/)
+@Deprecated(
+    "Function is semantically incorrect as there might be both dispatch and extension receivers. Replace call with appropriate logic.",
+    level = DeprecationLevel.ERROR
+)
+fun KtCallExpression.receiverType(): KotlinType? {
+    @Suppress("DEPRECATION_ERROR")
+    return receiverValue()?.type
+}
 
 fun KtCallExpression.previousCall(): KtCallExpression? {
     val parent = this.parent as? KtDotQualifiedExpression ?: return null

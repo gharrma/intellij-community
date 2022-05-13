@@ -4,6 +4,7 @@ package com.intellij.codeInsight.intention.impl.preview
 import com.intellij.codeInsight.intention.IntentionAction
 import com.intellij.codeInsight.intention.impl.preview.IntentionPreviewComponent.Companion.LOADING_PREVIEW
 import com.intellij.codeInsight.intention.impl.preview.IntentionPreviewComponent.Companion.NO_PREVIEW
+import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 import com.intellij.openapi.actionSystem.IdeActions
 import com.intellij.openapi.actionSystem.ShortcutSet
 import com.intellij.openapi.application.ModalityState
@@ -14,6 +15,8 @@ import com.intellij.openapi.editor.ex.EditorEx
 import com.intellij.openapi.editor.ex.SoftWrapChangeListener
 import com.intellij.openapi.editor.impl.EditorImpl
 import com.intellij.openapi.keymap.KeymapUtil
+import com.intellij.openapi.progress.EmptyProgressIndicator
+import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.JBPopup
 import com.intellij.openapi.ui.popup.JBPopupFactory
@@ -97,7 +100,7 @@ class IntentionPreviewPopupUpdateProcessor(private val project: Project,
     }
   }
 
-  private fun renderPreview(result: IntentionPreviewContent) {
+  private fun renderPreview(result: IntentionPreviewInfo) {
     when (result) {
       is IntentionPreviewDiffResult -> {
         val editors = IntentionPreviewModel.createEditors(project, result)
@@ -109,8 +112,8 @@ class IntentionPreviewPopupUpdateProcessor(private val project: Project,
         editorsToRelease.addAll(editors)
         select(index, editors)
       }
-      is IntentionPreviewHtmlResult -> {
-        select(index, html = result.html)
+      is IntentionPreviewInfo.Html -> {
+        select(index, html = result)
       }
       else -> {
         select(NO_PREVIEW)
@@ -143,7 +146,7 @@ class IntentionPreviewPopupUpdateProcessor(private val project: Project,
     return true
   }
 
-  private fun select(index: Int, editors: List<EditorEx> = emptyList(), @NlsSafe html: String = "") {
+  private fun select(index: Int, editors: List<EditorEx> = emptyList(), @NlsSafe html: IntentionPreviewInfo.Html? = null) {
     component.stopLoading()
     component.editors = editors
     component.html = html
@@ -154,10 +157,13 @@ class IntentionPreviewPopupUpdateProcessor(private val project: Project,
     val screen = ScreenUtil.getScreenRectangle(location)
 
     if (screen != null) {
-      val delta = screen.width + screen.x - location.x
-      if (size.width > delta) {
-        size.width = delta
+      var delta = screen.width + screen.x - location.x
+      val origLocation = originalPopup?.content?.locationOnScreen
+      // On the left side of the original popup: avoid overlap
+      if (origLocation != null && location.x < origLocation.x) {
+        delta = delta.coerceAtMost(origLocation.x - screen.x - PositionAdjuster.DEFAULT_GAP)
       }
+      size.width = size.width.coerceAtMost(delta)
     }
 
     component.editors.forEach {
@@ -186,13 +192,23 @@ class IntentionPreviewPopupUpdateProcessor(private val project: Project,
     fun getShortcutSet(): ShortcutSet = KeymapUtil.getActiveKeymapShortcuts(IdeActions.ACTION_QUICK_JAVADOC)
 
     @TestOnly
+    @JvmStatic
     fun getPreviewText(project: Project,
                        action: IntentionAction,
                        originalFile: PsiFile,
                        originalEditor: Editor): String? {
-      val preview = IntentionPreviewComputable(project, action, originalFile, originalEditor).generatePreview()
-      return preview?.psiFile?.text
+      return (getPreviewInfo(project, action, originalFile, originalEditor) as? IntentionPreviewDiffResult)?.psiFile?.text
     }
+
+    @TestOnly
+    @JvmStatic
+    fun getPreviewInfo(project: Project,
+                       action: IntentionAction,
+                       originalFile: PsiFile,
+                       originalEditor: Editor): IntentionPreviewInfo =
+      ProgressManager.getInstance().runProcess<IntentionPreviewInfo>(
+        { IntentionPreviewComputable(project, action, originalFile, originalEditor).generatePreview() },
+        EmptyProgressIndicator()) ?: IntentionPreviewInfo.EMPTY
   }
 
   internal class IntentionPreviewPopupKey

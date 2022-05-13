@@ -11,6 +11,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.util.Version
 import org.jetbrains.idea.maven.execution.MavenExternalParameters.resolveMavenHome
 import org.jetbrains.idea.maven.execution.MavenRunner
+import org.jetbrains.idea.maven.project.MavenGeneralSettings
 import org.jetbrains.idea.maven.project.MavenImportingSettings
 import org.jetbrains.idea.maven.project.MavenProjectsManager
 import org.jetbrains.idea.maven.server.MavenDistributionsCache
@@ -19,6 +20,10 @@ import java.io.File
 
 class MavenSettingsCollector : ProjectUsagesCollector() {
   override fun getGroupId() = "build.maven.state"
+
+  override fun getVersion(): Int {
+    return 3
+  }
 
   override fun getMetrics(project: Project): Set<MetricEvent> {
     val manager = MavenProjectsManager.getInstance(project)
@@ -43,7 +48,7 @@ class MavenSettingsCollector : ProjectUsagesCollector() {
     @Suppress("DEPRECATION")
     usages.add(newMetric("loggingLevel", generalSettings.loggingLevel))
     try {
-      val mavenWrapperFile = getMavenWrapper(manager, project)
+      val mavenWrapperFile = getMavenWrapper(manager, generalSettings, project)
       var mavenVersion = MavenUtil.getMavenVersion(resolveMavenHome(generalSettings, project, null, mavenWrapperFile))
       mavenVersion = mavenVersion?.let { Version.parseVersion(it)?.toCompactString() } ?: "unknown"
       usages.add(newMetric("mavenVersion", mavenVersion))
@@ -66,6 +71,7 @@ class MavenSettingsCollector : ProjectUsagesCollector() {
     usages.add(newBooleanMetric("keepSourceFolders", importingSettings.isKeepSourceFolders))
     usages.add(newBooleanMetric("excludeTargetFolder", importingSettings.isExcludeTargetFolder))
     usages.add(newBooleanMetric("useMavenOutput", importingSettings.isUseMavenOutput))
+    usages.add(newBooleanMetric("createSeparateModulesForMainAndTest", importingSettings.isImportToTreeStructure))
 
     usages.add(newMetric("generatedSourcesFolder", importingSettings.generatedSourcesFolder))
     usages.add(newMetric("updateFoldersOnImportPhase", importingSettings.updateFoldersOnImportPhase))
@@ -98,8 +104,9 @@ class MavenSettingsCollector : ProjectUsagesCollector() {
   }
 
   private fun getMavenWrapper(manager: MavenProjectsManager,
+                              generalSettings: MavenGeneralSettings,
                               project: Project): File? {
-    return if (manager.rootProjects.size == 1)
+    return if (MavenUtil.isWrapper(generalSettings) && manager.rootProjects.size == 1)
       MavenDistributionsCache.getInstance(project).getWrapper(manager.rootProjects.first().directory)?.mavenHome?.toFile() else null
   }
 }

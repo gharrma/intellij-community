@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.idea.core.copied
 import org.jetbrains.kotlin.idea.core.replaced
 import org.jetbrains.kotlin.lexer.KtSingleValueToken
 import org.jetbrains.kotlin.load.java.JvmAbi
+import org.jetbrains.kotlin.load.java.propertyNameByGetMethodName
 import org.jetbrains.kotlin.load.java.propertyNameBySetMethodName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.*
@@ -92,15 +93,13 @@ class SyntheticPropertyAccessorReferenceDescriptorImpl(
 
         val newNameAsName = Name.identifier(newElementName)
         val newName = if (getter) {
-            SyntheticJavaPropertyDescriptor.propertyNameByGetMethodName(newNameAsName)
+            propertyNameByGetMethodName(newNameAsName)
         } else {
             //TODO: it's not correct
             //TODO: setIsY -> setIsIsY bug
             propertyNameBySetMethodName(
                 newNameAsName,
-                withIsPrefix = expression.getReferencedNameAsName().asString().startsWith(
-                    "is"
-                )
+                withIsPrefix = expression.getReferencedNameAsName().asString().startsWith("is")
             )
         }
         // get/set becomes ordinary method

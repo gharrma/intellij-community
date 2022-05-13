@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.ui;
 
 import com.intellij.openapi.util.Key;
@@ -15,12 +15,19 @@ import java.util.List;
 import java.util.function.Predicate;
 
 public final class ComponentUtil {
+  /**
+   * @deprecated use {@link ClientProperty#get(Component, Key)} instead
+   */
+  @Deprecated
   public static <T> T getClientProperty(@NotNull JComponent component, @NotNull Key<T> key) {
-    Object value = component.getClientProperty(key);
-    //noinspection unchecked
-    return value != null ? (T)value : null;
+    return ClientProperty.get(component, key);
   }
 
+  /**
+   * @deprecated use {@link JComponent#putClientProperty(Object, Object)}
+   * or {@link ClientProperty#put(JComponent, Key, Object)} instead
+   */
+  @Deprecated
   public static <T> void putClientProperty(@NotNull JComponent component, @NotNull Key<T> key, T value) {
     component.putClientProperty(key, value);
   }

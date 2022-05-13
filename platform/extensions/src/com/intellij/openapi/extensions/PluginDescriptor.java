@@ -12,7 +12,6 @@ import java.nio.file.Path;
 import java.util.Date;
 
 public interface PluginDescriptor {
-
   @NotNull PluginId getPluginId();
 
   @Nullable ClassLoader getPluginClassLoader();
@@ -20,7 +19,7 @@ public interface PluginDescriptor {
   @ApiStatus.Experimental
   default @NotNull ClassLoader getClassLoader() {
     ClassLoader classLoader = getPluginClassLoader();
-    return classLoader != null ? classLoader : getClass().getClassLoader();
+    return classLoader == null ? getClass().getClassLoader() : classLoader;
   }
 
   default boolean isBundled() {
@@ -62,7 +61,7 @@ public interface PluginDescriptor {
 
   //TODO: remove default implementation in 2021.3
   default @Nullable @NlsSafe String getOrganization() {
-    return "";
+    return null;
   }
 
   @NlsSafe String getVersion();
@@ -81,7 +80,7 @@ public interface PluginDescriptor {
    * @deprecated doesn't make sense for installed plugins; use PluginNode#getDownloads
    */
   @Deprecated
-  @ApiStatus.ScheduledForRemoval(inVersion = "2021.1")
+  @ApiStatus.ScheduledForRemoval
   default @Nullable String getDownloads() {
     return null;
   }

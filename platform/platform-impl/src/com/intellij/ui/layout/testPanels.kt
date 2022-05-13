@@ -8,14 +8,12 @@ import com.intellij.openapi.ui.ComboBox
 import com.intellij.ui.JBIntSpinner
 import com.intellij.ui.UIBundle
 import com.intellij.ui.components.*
-import org.jetbrains.annotations.ApiStatus
 import java.awt.Dimension
 import java.awt.GridLayout
 import java.util.function.Supplier
 import javax.swing.*
 
 @Deprecated(message = "New UI DSL is implemented, see com.intellij.ui.dsl. Whole file should be removed")
-@ApiStatus.ScheduledForRemoval(inVersion = "2022.3")
 fun labelRowShouldNotGrow(): JPanel {
   return panel {
     row("Create Android module") { CheckBox("FooBar module name foo")() }
@@ -277,41 +275,6 @@ fun titledRows(): JPanel {
       row("JRE home:") {
         textFieldWithBrowseButton("").comment("At least OracleJRE 9 or OpenJRE 11 is required to import dump")
       }
-    }
-  }
-}
-
-fun hideableRow(): JPanel {
-  val dummyTextBinding = PropertyBinding({ "" }, {})
-
-  return panel {
-    row("Foo") {
-      textField(dummyTextBinding)
-    }
-    hideableRow("Bar") {
-      row {
-        textField(dummyTextBinding)
-      }
-      hideableRow("Nested hideable") {
-        row {
-          label("Label 1")
-        }
-        row {
-          label("Label 2")
-        }
-      }
-      row {
-        label("Text with largeGapAfter")
-      }.largeGapAfter()
-      row {
-        label("Text without largeGapAfter")
-      }
-      row {
-        label("Last Text with largeGapAfter")
-      }.largeGapAfter()
-    }
-    row {
-      label("Non hideable text")
     }
   }
 }

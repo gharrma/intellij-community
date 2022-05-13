@@ -1,5 +1,5 @@
 // "Add initializer" "false"
-// WITH_RUNTIME
+// WITH_STDLIB
 // ACTION: Convert to ordinary property
 // ACTION: Create test
 // ACTION: Make internal

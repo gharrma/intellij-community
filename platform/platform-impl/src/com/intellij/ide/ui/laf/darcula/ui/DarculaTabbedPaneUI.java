@@ -1,4 +1,4 @@
-// Copyright 2000-2019 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.ui.laf.darcula.ui;
 
 import com.intellij.icons.AllIcons;
@@ -7,6 +7,8 @@ import com.intellij.openapi.ui.JBPopupMenu;
 import com.intellij.openapi.util.SystemInfo;
 import com.intellij.ui.JBColor;
 import com.intellij.ui.RelativeFont;
+import com.intellij.ui.paint.LinePainter2D;
+import com.intellij.ui.paint.RectanglePainter2D;
 import com.intellij.util.ReflectionUtil;
 import com.intellij.util.ui.*;
 import org.jetbrains.annotations.Nullable;
@@ -50,7 +52,7 @@ public class DarculaTabbedPaneUI extends BasicTabbedPaneUI {
   private boolean tabsOverlapBorder;
   private boolean useSelectedRectBackup = false;
 
-  private static final JBValue OFFSET = new JBValue.Float(1);
+  protected static final JBValue OFFSET = new JBValue.Float(1);
 
   @SuppressWarnings({"MethodOverridesStaticMethodOfSuperclass", "UnusedDeclaration"})
   public static ComponentUI createUI(JComponent c) {
@@ -99,7 +101,7 @@ public class DarculaTabbedPaneUI extends BasicTabbedPaneUI {
 
     Object rStyle = UIManager.get("TabbedPane.tabFillStyle");
     tabStyle = rStyle != null ? TabStyle.valueOf(rStyle.toString()) : TabStyle.underline;
-    contentBorderInsets = tabPane.getTabLayoutPolicy() == JTabbedPane.WRAP_TAB_LAYOUT ? JBUI.insetsTop(1) : JBUI.emptyInsets();
+    contentBorderInsets = tabPane.getTabLayoutPolicy() == JTabbedPane.WRAP_TAB_LAYOUT ? JBUI.insetsTop(1) : JBInsets.emptyInsets();
     tabsOverlapBorder = UIManager.getBoolean("TabbedPane.tabsOverlapBorder");
   }
 
@@ -120,7 +122,7 @@ public class DarculaTabbedPaneUI extends BasicTabbedPaneUI {
         boolean fullBorder = tabPane.getClientProperty("JTabbedPane.hasFullBorder") == Boolean.TRUE;
         contentBorderInsets = (tabPane.getTabLayoutPolicy() == JTabbedPane.WRAP_TAB_LAYOUT) ?
                               fullBorder ? JBUI.insets(1) : JBUI.insetsTop(1) :
-                              fullBorder ? JBUI.insets(0, 1, 1, 1) : JBUI.emptyInsets();
+                              fullBorder ? JBUI.insets(0, 1, 1, 1) : JBInsets.emptyInsets();
         tabPane.revalidate();
         tabPane.repaint();
       }
@@ -345,27 +347,25 @@ public class DarculaTabbedPaneUI extends BasicTabbedPaneUI {
   @Override
   protected void paintTabBorder(Graphics g, int tabPlacement, int tabIndex, int x, int y, int w, int h, boolean isSelected) {
     if (isSelected && tabStyle == TabStyle.underline) {
-      g.setColor(tabPane.isEnabled() ? ENABLED_SELECTED_COLOR : DISABLED_SELECTED_COLOR);
-
       int offset;
       boolean wrap = tabPane.getTabLayoutPolicy() == JTabbedPane.WRAP_TAB_LAYOUT;
       switch (tabPlacement) {
         case LEFT:
           offset = SELECTION_HEIGHT.get() - (wrap ? OFFSET.get() : 0);
-          g.fillRect(x + w - offset, y, SELECTION_HEIGHT.get(), h);
+          paintUnderline(g, x + w - offset, y, SELECTION_HEIGHT.get(), h);
           break;
         case RIGHT:
           offset = wrap ? OFFSET.get() : 0;
-          g.fillRect(x - offset, y, SELECTION_HEIGHT.get(), h);
+          paintUnderline(g, x - offset, y, SELECTION_HEIGHT.get(), h);
           break;
         case BOTTOM:
           offset = wrap ? OFFSET.get() : 0;
-          g.fillRect(x, y - offset, w, SELECTION_HEIGHT.get());
+          paintUnderline(g, x, y - offset, w, SELECTION_HEIGHT.get());
           break;
         case TOP:
         default:
           offset = SELECTION_HEIGHT.get() - (wrap ? OFFSET.get() : 0);
-          g.fillRect(x, y + h - offset, w, SELECTION_HEIGHT.get());
+          paintUnderline(g, x, y + h - offset, w, SELECTION_HEIGHT.get());
           break;
       }
     }
@@ -514,7 +514,6 @@ public class DarculaTabbedPaneUI extends BasicTabbedPaneUI {
       JBPopupMenu menu = new JBPopupMenu();
       for (Map.Entry<Integer, Rectangle> entry : invisibleTabs.entrySet()) {
         final int index = entry.getKey();
-        //noinspection HardCodedStringLiteral
         menu.add(new JMenuItem(tabPane.getTitleAt(index), tabPane.getIconAt(index)) {
           @Override
           protected void fireActionPerformed(ActionEvent event) {
@@ -636,6 +635,19 @@ public class DarculaTabbedPaneUI extends BasicTabbedPaneUI {
         }
         myShowHiddenTabsButton.setBounds(bounds);
       }
+    }
+  }
+
+  private void paintUnderline(Graphics g, int x, int y, int w, int h) {
+    g.setColor(tabPane.isEnabled() ? ENABLED_SELECTED_COLOR : DISABLED_SELECTED_COLOR);
+    double arc = SELECTION_ARC.get();
+
+    if (arc == 0) {
+      g.fillRect(x, y, w, h);
+    }
+    else {
+      RectanglePainter2D.FILL.paint((Graphics2D)g, x, y, w, h, arc, LinePainter2D.StrokeType.INSIDE, 1.0,
+                                    RenderingHints.VALUE_ANTIALIAS_ON);
     }
   }
 }

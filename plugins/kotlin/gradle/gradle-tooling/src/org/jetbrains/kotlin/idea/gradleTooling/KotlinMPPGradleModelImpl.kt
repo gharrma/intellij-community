@@ -3,7 +3,6 @@
 package org.jetbrains.kotlin.idea.gradleTooling
 
 import org.gradle.api.tasks.Exec
-import org.jetbrains.kotlin.idea.gradleTooling.arguments.AbstractCompilerArgumentsCacheAware
 import org.jetbrains.kotlin.idea.gradleTooling.arguments.CompilerArgumentsCacheAwareImpl
 import org.jetbrains.kotlin.idea.projectModel.*
 import java.io.File
@@ -55,7 +54,7 @@ class KotlinSourceSetImpl(
     override val allDependsOnSourceSets: Set<String>,
     override val additionalVisibleSourceSets: Set<String>,
     actualPlatforms: KotlinPlatformContainerImpl = KotlinPlatformContainerImpl(),
-    isTestModule: Boolean = false
+    isTestComponent: Boolean = false
 ) : KotlinSourceSet {
 
     override val dependencies: Array<KotlinDependencyId> = regularDependencies + intransitiveDependencies
@@ -73,13 +72,13 @@ class KotlinSourceSetImpl(
         additionalVisibleSourceSets = HashSet(kotlinSourceSet.additionalVisibleSourceSets),
         actualPlatforms = KotlinPlatformContainerImpl(kotlinSourceSet.actualPlatforms)
     ) {
-        this.isTestModule = kotlinSourceSet.isTestModule
+        this.isTestComponent = kotlinSourceSet.isTestComponent
     }
 
     override var actualPlatforms: KotlinPlatformContainer = actualPlatforms
         internal set
 
-    override var isTestModule: Boolean = isTestModule
+    override var isTestComponent: Boolean = isTestComponent
         internal set
 
     override fun toString() = name
@@ -183,7 +182,7 @@ data class KotlinCompilationImpl(
         internal set
 
     // TODO: Logic like this is duplicated *and different*
-    override val isTestModule: Boolean
+    override val isTestComponent: Boolean
         get() = name == KotlinCompilation.TEST_COMPILATION_NAME
                 || platform == KotlinPlatform.ANDROID && name.contains("Test")
 
@@ -280,7 +279,7 @@ data class KotlinMPPGradleModelImpl(
     override val extraFeatures: ExtraFeatures,
     override val kotlinNativeHome: String,
     override val dependencyMap: Map<KotlinDependencyId, KotlinDependency>,
-    override val partialCacheAware: CompilerArgumentsCacheAware,
+    override val cacheAware: CompilerArgumentsCacheAware,
     override val kotlinImportingDiagnostics: KotlinImportingDiagnosticsContainer = mutableSetOf()
 ) : KotlinMPPGradleModel {
     constructor(mppModel: KotlinMPPGradleModel, cloningCache: MutableMap<Any, Any>) : this(
@@ -300,9 +299,18 @@ data class KotlinMPPGradleModelImpl(
         ),
         kotlinNativeHome = mppModel.kotlinNativeHome,
         dependencyMap = mppModel.dependencyMap.map { it.key to it.value.deepCopy(cloningCache) }.toMap(),
-        partialCacheAware = CompilerArgumentsCacheAwareImpl(mppModel.partialCacheAware),
+        cacheAware = CompilerArgumentsCacheAwareImpl(mppModel.cacheAware),
         kotlinImportingDiagnostics = mppModel.kotlinImportingDiagnostics.mapTo(mutableSetOf()) { it.deepCopy(cloningCache) }
     )
+
+    @Deprecated(
+        "Use KotlinGradleModel#cacheAware instead", level = DeprecationLevel.ERROR,
+        replaceWith = ReplaceWith("KotlinMPPGradleModel#cacheAware")
+    )
+    @Suppress("OverridingDeprecatedMember")
+    override val partialCacheAware: CompilerArgumentsCacheAware
+        get() = throw UnsupportedOperationException("Not yet implemented")
+
 }
 
 class KotlinPlatformContainerImpl() : KotlinPlatformContainer {

@@ -22,6 +22,7 @@ import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.containers.MultiMap;
 import com.siyeh.ig.InspectionGadgetsFix;
 import com.siyeh.ig.callMatcher.CallMatcher;
+import com.siyeh.ig.psiutils.MethodUtils;
 import com.siyeh.ig.psiutils.TypeUtils;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -35,10 +36,12 @@ import static com.intellij.psi.PsiModifier.*;
 public class ConvertToRecordFix extends InspectionGadgetsFix {
   private final boolean myShowAffectedMembers;
   private final boolean mySuggestAccessorsRenaming;
+  private final @NotNull List<String> myIgnoredAnnotations;
 
-  ConvertToRecordFix(boolean showAffectedMembers, boolean suggestAccessorsRenaming) {
+  ConvertToRecordFix(boolean showAffectedMembers, boolean suggestAccessorsRenaming, @NotNull List<String> ignoredAnnotations) {
     myShowAffectedMembers = showAffectedMembers;
     mySuggestAccessorsRenaming = suggestAccessorsRenaming;
+    myIgnoredAnnotations = ignoredAnnotations;
   }
 
   @Override
@@ -58,7 +61,7 @@ public class ConvertToRecordFix extends InspectionGadgetsFix {
     PsiClass psiClass = ObjectUtils.tryCast(psiElement.getParent(), PsiClass.class);
     if (psiClass == null) return;
 
-    RecordCandidate recordCandidate = getClassDefinition(psiClass, mySuggestAccessorsRenaming);
+    RecordCandidate recordCandidate = getClassDefinition(psiClass, mySuggestAccessorsRenaming, myIgnoredAnnotations);
     if (recordCandidate == null) return;
 
     ConvertToRecordProcessor processor = new ConvertToRecordProcessor(recordCandidate, myShowAffectedMembers);
@@ -70,7 +73,9 @@ public class ConvertToRecordFix extends InspectionGadgetsFix {
    * There are some restrictions for records:
    * https://docs.oracle.com/javase/specs/jls/se15/preview/specs/records-jls.html.
    */
-  public static RecordCandidate getClassDefinition(@NotNull PsiClass psiClass, boolean suggestAccessorsRenaming) {
+  public static RecordCandidate getClassDefinition(@NotNull PsiClass psiClass,
+                                                   boolean suggestAccessorsRenaming,
+                                                   @NotNull List<String> ignoredAnnotations) {
     boolean isNotAppropriatePsiClass = psiClass.isEnum() || psiClass.isAnnotationType() || psiClass instanceof PsiAnonymousClass ||
                                        psiClass.isInterface() || psiClass.isRecord();
     if (isNotAppropriatePsiClass) return null;
@@ -79,8 +84,6 @@ public class ConvertToRecordFix extends InspectionGadgetsFix {
     if (psiClassModifiers == null || psiClassModifiers.hasModifierProperty(ABSTRACT) || psiClassModifiers.hasModifierProperty(SEALED)) {
       return null;
     }
-    if (!mayBeFinal(psiClass)) return null;
-
     // todo support local classes later
     if (PsiUtil.isLocalClass(psiClass)) return null;
     if (psiClass.getContainingClass() != null && !psiClass.hasModifierProperty(STATIC)) return null;
@@ -90,16 +93,11 @@ public class ConvertToRecordFix extends InspectionGadgetsFix {
 
     if (ContainerUtil.exists(psiClass.getInitializers(), initializer -> !initializer.hasModifierProperty(STATIC))) return null;
 
+    if (AnnotationUtil.checkAnnotatedUsingPatterns(psiClass, ignoredAnnotations)) return null;
+
     RecordCandidate result = new RecordCandidate(psiClass, suggestAccessorsRenaming);
     if (!result.isValid()) return null;
     return ClassInheritorsSearch.search(psiClass, false).findFirst() == null ? result : null;
-  }
-
-  /**
-   * Some classes might be proxied e.g. according to JPA spec an entity class can't be final.
-   */
-  private static boolean mayBeFinal(@NotNull PsiClass psiClass) {
-    return !psiClass.hasAnnotation("javax.persistence.Entity");
   }
 
   /**
@@ -116,6 +114,9 @@ public class ConvertToRecordFix extends InspectionGadgetsFix {
     private final MultiMap<PsiField, FieldAccessorCandidate> myFieldAccessors = new MultiMap<>(new LinkedHashMap<>());
     private final List<PsiMethod> myOrdinaryMethods = new SmartList<>();
     private final List<RecordConstructorCandidate> myConstructors = new SmartList<>();
+    
+    private PsiMethod myEqualsMethod;
+    private PsiMethod myHashCodeMethod;
 
     private Map<PsiField, FieldAccessorCandidate> myFieldAccessorsCache;
 
@@ -153,6 +154,16 @@ public class ConvertToRecordFix extends InspectionGadgetsFix {
       return myConstructors.size() == 1 ? myConstructors.get(0).myConstructor : null;
     }
 
+    @Nullable
+    PsiMethod getEqualsMethod() {
+      return myEqualsMethod;
+    }
+
+    @Nullable
+    PsiMethod getHashCodeMethod() {
+      return myHashCodeMethod;
+    }
+
     private boolean isValid() {
       if (myConstructors.size() > 1) return false;
       if (myConstructors.size() == 1) {
@@ -188,6 +199,14 @@ public class ConvertToRecordFix extends InspectionGadgetsFix {
       for (PsiMethod method : myClass.getMethods()) {
         if (method.isConstructor()) {
           myConstructors.add(new RecordConstructorCandidate(method, myFieldAccessors.keySet()));
+          continue;
+        }
+        if (MethodUtils.isEquals(method)) {
+          myEqualsMethod = method;
+          continue;
+        }
+        if (MethodUtils.isHashCode(method)) {
+          myHashCodeMethod = method;
           continue;
         }
         if (!throwsOnlyUncheckedExceptions(method)) {

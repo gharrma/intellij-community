@@ -1,9 +1,10 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.java.codeInsight.daemon
 
 import com.intellij.codeInsight.daemon.impl.JavaHighlightInfoTypes
 import com.intellij.codeInsight.daemon.impl.analysis.JavaModuleGraphUtil
 import com.intellij.codeInsight.intention.IntentionActionDelegate
+import com.intellij.codeInspection.IllegalDependencyOnInternalPackageInspection
 import com.intellij.codeInspection.deprecation.DeprecationInspection
 import com.intellij.codeInspection.deprecation.MarkedForRemovalInspection
 import com.intellij.java.testFramework.fixtures.LightJava9ModulesCodeInsightFixtureTestCase
@@ -12,7 +13,9 @@ import com.intellij.java.testFramework.fixtures.MultiModuleJava9ProjectDescripto
 import com.intellij.openapi.roots.ProjectRootManager
 import com.intellij.openapi.util.TextRange
 import com.intellij.psi.PsiManager
+import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.search.ProjectScope
+import com.intellij.psi.util.PsiUtilCore
 import org.assertj.core.api.Assertions.assertThat
 import java.util.jar.JarFile
 
@@ -39,6 +42,16 @@ class ModuleHighlightingTest : LightJava9ModulesCodeInsightFixtureTestCase() {
     assertEquals(2, keywords.size)
     assertEquals(TextRange(0, 6), TextRange(keywords[0].startOffset, keywords[0].endOffset))
     assertEquals(TextRange(11, 18), TextRange(keywords[1].startOffset, keywords[1].endOffset))
+  }
+  
+  fun testDependencyOnIllegalPackage() {
+    addFile("a/secret/Secret.java", "package a.secret;\npublic class Secret {}", M4)
+    addFile("module-info.java", "module M4 { exports pkg.module; }", M4)
+    myFixture.enableInspections(IllegalDependencyOnInternalPackageInspection())
+    myFixture.configureByText("C.java", "package pkg;\n" +
+                                        "import a.secret.*;\n" +
+                                        "public class C {<error descr=\"Illegal dependency: module 'M4' doesn't export package 'a.secret'\">Secret</error> s; }")
+    myFixture.checkHighlighting()
   }
 
   fun testWrongFileName() {
@@ -120,7 +133,7 @@ class ModuleHighlightingTest : LightJava9ModulesCodeInsightFixtureTestCase() {
           requires <error descr="Module is not in dependencies: M3">M3</error>;
           requires <warning descr="Ambiguous module reference: lib.auto">lib.auto</warning>;
           requires lib.multi.release;
-          requires lib.named;
+          requires <warning descr="Ambiguous module reference: lib.named">lib.named</warning>;
           requires lib.claimed;
           requires all.fours;
         }""".trimIndent())
@@ -493,6 +506,12 @@ class ModuleHighlightingTest : LightJava9ModulesCodeInsightFixtureTestCase() {
 
     ProjectRootManager.getInstance(project).incModificationCount()
     assertNotSame(libModule, JavaModuleGraphUtil.findDescriptorByElement(libClass)!!)
+  }
+
+  fun testModuleInSources() {
+    val classInLibrary = myFixture.javaFacade.findClass("lib.named.C", GlobalSearchScope.allScope(project))!!
+    val elementInSources = classInLibrary.navigationElement
+    assertThat(JavaModuleGraphUtil.findDescriptorByFile (PsiUtilCore.getVirtualFile(elementInSources), project)).isNotNull
   }
 
   //<editor-fold desc="Helpers.">

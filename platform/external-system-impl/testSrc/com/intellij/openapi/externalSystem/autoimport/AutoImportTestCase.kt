@@ -1,4 +1,4 @@
-// Copyright 2000-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.openapi.externalSystem.autoimport
 
 import com.intellij.core.CoreBundle
@@ -10,15 +10,15 @@ import com.intellij.openapi.components.ComponentManager
 import com.intellij.openapi.editor.Document
 import com.intellij.openapi.externalSystem.ExternalSystemAutoImportAware
 import com.intellij.openapi.externalSystem.ExternalSystemManager
+import com.intellij.openapi.externalSystem.autoimport.ExternalSystemModificationType.INTERNAL
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectTrackerSettings.AutoReloadType
 import com.intellij.openapi.externalSystem.autoimport.ExternalSystemProjectTrackerSettings.AutoReloadType.*
 import com.intellij.openapi.externalSystem.autoimport.MockProjectAware.RefreshCollisionPassType
-import com.intellij.openapi.externalSystem.autoimport.ProjectStatus.ModificationType
 import com.intellij.openapi.externalSystem.importing.ProjectResolverPolicy
 import com.intellij.openapi.externalSystem.service.project.autoimport.ProjectAware
-import com.intellij.openapi.externalSystem.test.ExternalSystemTestCase
-import com.intellij.openapi.externalSystem.test.ExternalSystemTestUtil.TEST_EXTERNAL_SYSTEM_ID
-import com.intellij.openapi.externalSystem.test.TestExternalSystemManager
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestCase
+import com.intellij.platform.externalSystem.testFramework.ExternalSystemTestUtil.TEST_EXTERNAL_SYSTEM_ID
+import com.intellij.platform.externalSystem.testFramework.TestExternalSystemManager
 import com.intellij.openapi.fileEditor.FileDocumentManager
 import com.intellij.openapi.progress.util.BackgroundTaskUtil
 import com.intellij.openapi.project.Project
@@ -47,7 +47,7 @@ abstract class AutoImportTestCase : ExternalSystemTestCase() {
   override fun getExternalSystemConfigFileName() = throw UnsupportedOperationException()
 
   protected lateinit var testDisposable: Disposable
-  private val notificationAware get() = ProjectNotificationAware.getInstance(myProject)
+  private val notificationAware get() =  AutoImportProjectNotificationAware.getInstance(myProject)
   private val projectTracker get() = AutoImportProjectTracker.getInstance(myProject).also { it.enableAutoImportInTests() }
   private val projectTrackerSettings get() = AutoImportProjectTrackerSettings.getInstance(myProject)
 
@@ -185,10 +185,11 @@ abstract class AutoImportTestCase : ExternalSystemTestCase() {
   protected fun VirtualFile.delete() =
     runWriteAction { delete(null) }
 
-  fun VirtualFile.modify(modificationType: ModificationType = ModificationType.INTERNAL) {
+  fun VirtualFile.modify(modificationType: ExternalSystemModificationType = INTERNAL) {
     when (modificationType) {
-      ModificationType.INTERNAL -> appendLine("println 'hello'")
-      ModificationType.EXTERNAL -> appendLineInIoFile("println 'hello'")
+      INTERNAL -> appendLine("println 'hello'")
+      ExternalSystemModificationType.EXTERNAL -> appendLineInIoFile("println 'hello'")
+      ExternalSystemModificationType.UNKNOWN -> throw UnsupportedOperationException()
     }
   }
 
@@ -522,7 +523,7 @@ abstract class AutoImportTestCase : ExternalSystemTestCase() {
     projectAware: MockProjectAware,
     private val settingsFile: VirtualFile
   ) : SimpleTestBench(projectAware) {
-    fun modifySettingsFile(modificationType: ModificationType = ModificationType.INTERNAL) = settingsFile.modify(modificationType)
+    fun modifySettingsFile(modificationType: ExternalSystemModificationType = INTERNAL) = settingsFile.modify(modificationType)
   }
 
   inner class DummyExternalSystemTestBench(val projectAware: ProjectAwareWrapper) {

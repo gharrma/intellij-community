@@ -1,6 +1,6 @@
 // "Opt in for 'A' in containing file 'appendFileAnnotationToAnnotationList.kt'" "true"
 // COMPILER_ARGUMENTS: -Xopt-in=kotlin.RequiresOptIn
-// WITH_RUNTIME
+// WITH_STDLIB
 @file:[
     JvmName("Foo")
     OptIn(B::class)

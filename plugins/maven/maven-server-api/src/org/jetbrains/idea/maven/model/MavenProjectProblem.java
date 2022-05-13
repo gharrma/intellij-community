@@ -15,6 +15,8 @@
  */
 package org.jetbrains.idea.maven.model;
 
+import org.jetbrains.annotations.Nullable;
+
 import java.io.File;
 import java.io.Serializable;
 import java.text.MessageFormat;
@@ -25,13 +27,15 @@ import java.util.LinkedHashSet;
 public class MavenProjectProblem implements Serializable {
   //todo: this enum values are write-only now
   public enum ProblemType {
-    SYNTAX, STRUCTURE, DEPENDENCY, PARENT, SETTINGS_OR_PROFILES, REPOSITORY_BLOCKED, REPOSITORY
+    SYNTAX, STRUCTURE, DEPENDENCY, PARENT, SETTINGS_OR_PROFILES, ARTIFACT_TRANSFER
   }
 
   private final boolean myRecoverable;
   private final String myPath;
   private final String myDescription;
   private final ProblemType myType;
+  @Nullable
+  private final MavenArtifact myMavenArtifact;
 
   public static MavenProjectProblem createStructureProblem(String path, String description, boolean recoverable) {
     return createProblem(path, description, MavenProjectProblem.ProblemType.STRUCTURE, recoverable);
@@ -52,6 +56,13 @@ public class MavenProjectProblem implements Serializable {
     return new MavenProjectProblem(path, description, type, recoverable);
   }
 
+  public static MavenProjectProblem createArtifactTransferProblem(String path,
+                                                                  String description,
+                                                                  boolean recoverable,
+                                                                  MavenArtifact mavenArtifact) {
+    return new MavenProjectProblem(path, description, ProblemType.ARTIFACT_TRANSFER, recoverable, mavenArtifact);
+  }
+
   public static Collection<MavenProjectProblem> createProblemsList() {
     return createProblemsList(Collections.<MavenProjectProblem>emptySet());
   }
@@ -61,10 +72,15 @@ public class MavenProjectProblem implements Serializable {
   }
 
   public MavenProjectProblem(String path, String description, ProblemType type, boolean recoverable) {
+    this(path, description, type, recoverable, null);
+  }
+
+  public MavenProjectProblem(String path, String description, ProblemType type, boolean recoverable, MavenArtifact mavenArtifact) {
     myPath = path;
     myDescription = description;
     myType = type;
     myRecoverable = recoverable;
+    myMavenArtifact = mavenArtifact;
   }
 
   public String getPath() {
@@ -75,12 +91,17 @@ public class MavenProjectProblem implements Serializable {
     return myRecoverable;
   }
 
-  public String getDescription() {
+  public @Nullable String getDescription() {
     return myDescription;
   }
 
   public ProblemType getType() {
     return myType;
+  }
+
+  @Nullable
+  public MavenArtifact getMavenArtifact() {
+    return myMavenArtifact;
   }
 
   @Override

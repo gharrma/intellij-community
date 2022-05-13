@@ -1,9 +1,10 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.openapi.progress.impl;
 
 import com.intellij.codeWithMe.ClientId;
 import com.intellij.diagnostic.ThreadDumper;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.application.Application;
 import com.intellij.openapi.application.ApplicationManager;
 import com.intellij.openapi.application.ModalityState;
@@ -413,10 +414,15 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
     }
   }
 
+  @NotNull
+  protected ProgressIndicator createDefaultAsynchronousProgressIndicator(@NotNull Task.Backgroundable task) {
+    return new EmptyProgressIndicator();
+  }
+
   // from any: bg
   @NotNull
   public Future<?> runProcessWithProgressAsynchronously(@NotNull Task.Backgroundable task) {
-    return runProcessWithProgressAsynchronously(task, new EmptyProgressIndicator(), null);
+    return runProcessWithProgressAsynchronously(task, createDefaultAsynchronousProgressIndicator(task), null);
   }
 
   // from any: bg
@@ -479,16 +485,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
     else {
       indicatorDisposable = null;
     }
-    return runProcessWithProgressAsync(task, CompletableFuture.completedFuture(progressIndicator), continuation, indicatorDisposable,
-                                       modalityState);
-  }
 
-  @NotNull
-  protected Future<?> runProcessWithProgressAsync(@NotNull Task.Backgroundable task,
-                                                  @NotNull CompletableFuture<? extends @NotNull ProgressIndicator> progressIndicator,
-                                                  @Nullable Runnable continuation,
-                                                  @Nullable IndicatorDisposable indicatorDisposable,
-                                                  @Nullable ModalityState modalityState) {
     AtomicLong elapsed = new AtomicLong();
     return new ProgressRunner<>(progress -> {
       long start = System.currentTimeMillis();
@@ -507,20 +504,7 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
           notifyTaskFinished(task, elapsed.get());
         }
 
-        ModalityState modality;
-        if (modalityState != null) {
-          modality = modalityState;
-        }
-        else {
-          try {
-            modality = progressIndicator.get().getModalityState();
-          }
-          catch (Throwable e) {
-            modality = ModalityState.NON_MODAL;
-          }
-        }
-
-        ApplicationUtil.invokeLaterSomewhere(task.whereToRunCallbacks(), modality, () -> {
+        ApplicationUtil.invokeLaterSomewhere(task.whereToRunCallbacks(), modalityState, () -> {
           finishTask(task, result.isCanceled(), result.getThrowable() instanceof ProcessCanceledException ? null : result.getThrowable());
           if (indicatorDisposable != null) {
             Disposer.dispose(indicatorDisposable);
@@ -633,28 +617,29 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
   }
 
   private <V, E extends Throwable> V computeUnderProgress(@NotNull ThrowableComputable<V, E> process, ProgressIndicator progress) throws E {
-    if (progress == null) myUnsafeProgressCount.incrementAndGet();
-
-    try {
-      ProgressIndicator oldIndicator = null;
-      boolean set = progress != null && progress != (oldIndicator = getProgressIndicator());
-      if (set) {
-        Thread currentThread = Thread.currentThread();
-        long threadId = currentThread.getId();
-        setCurrentIndicator(threadId, progress);
-        try {
-          return registerIndicatorAndRun(progress, currentThread, oldIndicator, process);
-        }
-        finally {
-          setCurrentIndicator(threadId, oldIndicator);
-        }
-      }
-      else {
+    if (progress == null) {
+      myUnsafeProgressCount.incrementAndGet();
+      try {
         return process.compute();
       }
+      finally {
+        myUnsafeProgressCount.decrementAndGet();
+      }
+    }
+
+    ProgressIndicator oldIndicator = getProgressIndicator();
+    if (progress == oldIndicator) {
+      return process.compute();
+    }
+
+    Thread currentThread = Thread.currentThread();
+    long threadId = currentThread.getId();
+    setCurrentIndicator(threadId, progress);
+    try {
+      return registerIndicatorAndRun(progress, currentThread, oldIndicator, process);
     }
     finally {
-      if (progress == null) myUnsafeProgressCount.decrementAndGet();
+      setCurrentIndicator(threadId, oldIndicator);
     }
   }
 
@@ -976,6 +961,22 @@ public class CoreProgressManager extends ProgressManager implements Disposable {
 
   private static ProgressIndicator getCurrentIndicator(@NotNull Thread thread) {
     return currentIndicators.get(thread.getId());
+  }
+
+  @Override
+  public @NotNull AccessToken silenceGlobalIndicator() {
+    long id = Thread.currentThread().getId();
+    ProgressIndicator indicator = currentIndicators.get(id);
+    setCurrentIndicator(id, null);
+    return new AccessToken() {
+      @Override
+      public void finish() {
+        if (currentIndicators.containsKey(id)) {
+          throw new IllegalStateException("Indicator was not reset correctly");
+        }
+        setCurrentIndicator(id, indicator);
+      }
+    };
   }
 
   @FunctionalInterface

@@ -20,7 +20,7 @@ import java.util.function.Supplier;
  * @deprecated Use {@link ContainerUtil#createConcurrentWeakKeySoftValueMap()} instead
  */
 @Deprecated
-@ApiStatus.ScheduledForRemoval(inVersion = "2021.3")
+@ApiStatus.ScheduledForRemoval
 public class ConcurrentWeakKeySoftValueHashMap<K, V> implements ConcurrentMap<K, V> {
   private final ConcurrentMap<KeyReference<K,V>, ValueReference<K,V>> myMap;
   final ReferenceQueue<K> myKeyQueue = new ReferenceQueue<>();
@@ -199,7 +199,7 @@ public class ConcurrentWeakKeySoftValueHashMap<K, V> implements ConcurrentMap<K,
   private static final ThreadLocal<HardKey<?,?>> HARD_KEY = ThreadLocal.withInitial(() -> new HardKey<>());
 
   @NotNull
-  private HardKey<K,V> createHardKey(Object o) {
+  private HardKey<K,V> createHardKey(@NotNull Object o) {
     //noinspection unchecked
     K key = (K)o;
     //noinspection unchecked
@@ -223,17 +223,17 @@ public class ConcurrentWeakKeySoftValueHashMap<K, V> implements ConcurrentMap<K,
   }
 
   @Override
-  public boolean containsKey(Object key) {
+  public boolean containsKey(@NotNull Object key) {
     throw RefValueHashMapUtil.pointlessContainsKey();
   }
 
   @Override
-  public boolean containsValue(Object value) {
+  public boolean containsValue(@NotNull Object value) {
     throw RefValueHashMapUtil.pointlessContainsValue();
   }
 
   @Override
-  public V remove(Object key) {
+  public V remove(@NotNull Object key) {
     HardKey<K,V> hardKey = createHardKey(key);
     try {
       ValueReference<K, V> valueReference = myMap.remove(hardKey);

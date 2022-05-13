@@ -3,7 +3,10 @@
 package org.jetbrains.kotlin.idea.caches
 
 import com.intellij.ide.highlighter.JavaClassFileType
+import com.intellij.model.ModelBranch
+import com.intellij.model.ModelBranchUtil
 import com.intellij.openapi.components.service
+import com.intellij.openapi.diagnostic.ControlFlowException
 import com.intellij.openapi.util.Key
 import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.VirtualFileWithId
@@ -52,7 +55,14 @@ class IDEKotlinBinaryClassCache {
         file: VirtualFile,
         fileContent: ByteArray?
     ): KotlinJvmBinaryClass? {
-        val kotlinBinaryClass = KotlinBinaryClassCache.getKotlinBinaryClassOrClassFileContent(file, fileContent)?.toKotlinJvmBinaryClass()
+        if (ModelBranch.getFileBranch(file) != null) return null
+        val classFileContent = try {
+          KotlinBinaryClassCache.getKotlinBinaryClassOrClassFileContent(file, fileContent)
+        } catch (e: Exception) {
+            if (e is ControlFlowException) throw e
+            return null
+        }
+        val kotlinBinaryClass = classFileContent?.toKotlinJvmBinaryClass()
 
         val isKotlinBinaryClass = kotlinBinaryClass != null
         if (file is VirtualFileWithId) {

@@ -1,10 +1,14 @@
 // Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
 package com.intellij.ide.actions.searcheverywhere.ml
 
-import com.intellij.ide.actions.searcheverywhere.*
+import com.intellij.ide.actions.searcheverywhere.SearchEverywhereContributor
+import com.intellij.ide.actions.searcheverywhere.SearchEverywhereFoundElementInfo
+import com.intellij.ide.actions.searcheverywhere.SearchRestartReason
 import com.intellij.ide.actions.searcheverywhere.ml.features.SearchEverywhereContextFeaturesProvider
 import com.intellij.ide.actions.searcheverywhere.ml.features.SearchEverywhereElementFeaturesProvider
+import com.intellij.ide.actions.searcheverywhere.ml.features.statistician.SearchEverywhereStatisticianService
 import com.intellij.ide.actions.searcheverywhere.ml.id.SearchEverywhereMlItemIdProvider
+import com.intellij.ide.actions.searcheverywhere.ml.model.SearchEverywhereModelProvider
 import com.intellij.ide.actions.searcheverywhere.ml.performance.PerformanceTracker
 import com.intellij.openapi.project.Project
 import java.util.concurrent.atomic.AtomicReference
@@ -13,6 +17,7 @@ internal class SearchEverywhereMLSearchSession(project: Project?, private val se
   val itemIdProvider = SearchEverywhereMlItemIdProvider()
   private val sessionStartTime: Long = System.currentTimeMillis()
   private val providersCaches: Map<Class<out SearchEverywhereElementFeaturesProvider>, Any>
+  private val modelProviderWithCache: SearchEverywhereModelProvider = SearchEverywhereModelProvider()
 
   // context features are calculated once per Search Everywhere session
   val cachedContextInfo: SearchEverywhereMLContextInfo = SearchEverywhereMLContextInfo(project)
@@ -31,12 +36,14 @@ internal class SearchEverywhereMLSearchSession(project: Project?, private val se
       .toMap()
   }
 
-  fun onSearchRestart(project: Project?, previousElementsProvider: () -> List<SearchEverywhereFoundElementInfo>,
+  fun onSearchRestart(project: Project?,
+                      experimentStrategy: SearchEverywhereMlExperiment,
                       reason: SearchRestartReason,
                       tabId: String,
                       keysTyped: Int,
                       backspacesTyped: Int,
-                      queryLength: Int) {
+                      searchQuery: String,
+                      previousElementsProvider: () -> List<SearchEverywhereFoundElementInfo>) {
     val prevTimeToResult = performanceTracker.timeElapsed
 
     val prevState = currentSearchState.getAndUpdate { prevState ->
@@ -45,13 +52,20 @@ internal class SearchEverywhereMLSearchSession(project: Project?, private val se
       val nextSearchIndex = (prevState?.searchIndex ?: 0) + 1
       performanceTracker.start()
 
-      SearchEverywhereMlSearchState(sessionStartTime, startTime, nextSearchIndex, searchReason, tabId, keysTyped, backspacesTyped,
-        queryLength, providersCaches)
+      SearchEverywhereMlSearchState(
+        sessionStartTime, startTime, nextSearchIndex, searchReason, tabId, keysTyped, backspacesTyped,
+        searchQuery, modelProviderWithCache, providersCaches
+      )
     }
 
-    if (prevState != null && isMLSupportedTab(prevState.tabId)) {
-      logger.onSearchRestarted(project, sessionId, prevState.searchIndex, itemIdProvider, cachedContextInfo, prevState,
-        prevTimeToResult, previousElementsProvider)
+    if (prevState != null && experimentStrategy.isLoggingEnabledForTab(prevState.tabId)) {
+      val orderByMl = orderedByMl(prevState.tabId)
+      val experimentGroup = experimentStrategy.experimentGroup
+      logger.onSearchRestarted(
+        project, sessionId, prevState.searchIndex, experimentGroup, orderByMl,
+        itemIdProvider, cachedContextInfo, prevState,
+        prevTimeToResult, previousElementsProvider
+      )
     }
   }
 
@@ -59,7 +73,12 @@ internal class SearchEverywhereMLSearchSession(project: Project?, private val se
                      indexes: IntArray, selectedItems: List<Any>, closePopup: Boolean,
                      elementsProvider: () -> List<SearchEverywhereFoundElementInfo>) {
     val state = getCurrentSearchState()
-    if (state != null && isMLSupportedTab(state.tabId)) {
+    if (state != null && experimentStrategy.isLoggingEnabledForTab(state.tabId)) {
+      if (project != null) {
+        val statisticianService = SearchEverywhereStatisticianService.getInstance(project)
+        selectedItems.forEach { statisticianService.increaseUseCount(it) }
+      }
+
       val orderByMl = orderedByMl(state.tabId)
       logger.onItemSelected(
         project, sessionId, state.searchIndex,
@@ -71,10 +90,11 @@ internal class SearchEverywhereMLSearchSession(project: Project?, private val se
     }
   }
 
-  fun onSearchFinished(project: Project?, experimentStrategy: SearchEverywhereMlExperiment,
+  fun onSearchFinished(project: Project?,
+                       experimentStrategy: SearchEverywhereMlExperiment,
                        elementsProvider: () -> List<SearchEverywhereFoundElementInfo>) {
     val state = getCurrentSearchState()
-    if (state != null && isMLSupportedTab(state.tabId)) {
+    if (state != null && experimentStrategy.isLoggingEnabledForTab(state.tabId)) {
       val orderByMl = orderedByMl(state.tabId)
       logger.onSearchFinished(
         project, sessionId, state.searchIndex,
@@ -91,7 +111,7 @@ internal class SearchEverywhereMLSearchSession(project: Project?, private val se
 
   fun getMLWeight(contributor: SearchEverywhereContributor<*>, element: Any, matchingDegree: Int): Double {
     val state = getCurrentSearchState()
-    if (state != null && isMLSupportedTab(state.tabId)) {
+    if (state != null && SearchEverywhereTabWithMl.findById(state.tabId) != null) {
       val id = itemIdProvider.getId(element)
       return state.getMLWeight(id, element, contributor, cachedContextInfo, matchingDegree)
     }
@@ -102,15 +122,7 @@ internal class SearchEverywhereMLSearchSession(project: Project?, private val se
     return SearchEverywhereMlSessionService.getService().shouldOrderByMl(tabId)
   }
 
-  fun isMLSupportedTab(tabId: String): Boolean {
-    return isFilesTab(tabId) || isActionsTab(tabId)
-  }
-
   fun getCurrentSearchState() = currentSearchState.get()
-
-  private fun isFilesTab(tabId: String) = FileSearchEverywhereContributor::class.java.simpleName == tabId
-
-  private fun isActionsTab(tabId: String) = ActionSearchEverywhereContributor::class.java.simpleName == tabId
 }
 
 internal class SearchEverywhereMLContextInfo(project: Project?) {

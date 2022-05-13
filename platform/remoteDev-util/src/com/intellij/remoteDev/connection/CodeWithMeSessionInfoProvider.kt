@@ -18,5 +18,6 @@ interface CodeWithMeSessionInfoProvider {
   val hostFeaturesToEnable: Set<String>?
 
   val stunTurnServers: List<StunTurnServerInfo>?
+
   val downloadPgpPublicKeyUrl: String?
 }

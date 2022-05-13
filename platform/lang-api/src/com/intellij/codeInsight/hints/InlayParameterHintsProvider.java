@@ -47,6 +47,9 @@ public interface InlayParameterHintsProvider {
    * which allow enabling/disabling hints at a given position.
    *
    * Make sure that this method executed fast enough to run on EDT.
+   *
+   * @param element the element under the caret
+   *
    */
   @Nullable
   default HintInfo getHintInfo(@NotNull PsiElement element) {
@@ -58,6 +61,8 @@ public interface InlayParameterHintsProvider {
    * which allow enabling/disabling hints at a given position.
    *
    * Make sure that this method executed fast enough to run on EDT.
+   *
+   * @param element the element under the caret
    */
   @Nullable
   default HintInfo getHintInfo(@NotNull PsiElement element, @NotNull PsiFile file) {
@@ -143,6 +148,9 @@ public interface InlayParameterHintsProvider {
   default SyntaxTraverser<PsiElement> createTraversal(@NotNull PsiElement root) {
     return SyntaxTraverser.psiTraverser(root);
   }
+
+  @Nls
+  default String getDescription() { return null; }
 
   /**
    * @param key bundle key of the option.

@@ -9,11 +9,11 @@ import org.jetbrains.kotlin.asJava.elements.KtLightMethod
 import org.jetbrains.kotlin.j2k.ast.*
 import org.jetbrains.kotlin.lexer.KtTokens
 import org.jetbrains.kotlin.load.java.JvmAbi
+import org.jetbrains.kotlin.load.java.propertyNameByGetMethodName
 import org.jetbrains.kotlin.load.java.propertyNameBySetMethodName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.psi.KtProperty
 import org.jetbrains.kotlin.psi.psiUtil.isAncestor
-import org.jetbrains.kotlin.synthetic.SyntheticJavaPropertyDescriptor
 import org.jetbrains.kotlin.utils.addIfNotNull
 
 class PropertyInfo(
@@ -461,7 +461,7 @@ private class PropertyDetector(
 
         val name = method.name
         if (!Name.isValidIdentifier(name)) return null
-        val propertyName = SyntheticJavaPropertyDescriptor.propertyNameByGetMethodName(Name.identifier(name))?.identifier ?: return null
+        val propertyName = propertyNameByGetMethodName(Name.identifier(name))?.identifier ?: return null
 
         val returnType = method.returnType ?: return null
         if (returnType.canonicalText == "void") return null

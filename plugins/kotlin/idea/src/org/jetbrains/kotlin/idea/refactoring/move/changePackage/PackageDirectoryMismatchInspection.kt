@@ -3,6 +3,7 @@
 package org.jetbrains.kotlin.idea.refactoring.move.changePackage
 
 import com.intellij.CommonBundle
+import com.intellij.codeInsight.intention.preview.IntentionPreviewInfo
 import com.intellij.codeInspection.LocalQuickFix
 import com.intellij.codeInspection.ProblemDescriptor
 import com.intellij.codeInspection.ProblemsHolder
@@ -14,7 +15,9 @@ import com.intellij.refactoring.PackageWrapper
 import com.intellij.refactoring.move.moveClassesOrPackages.AutocreatingSingleSourceRootMoveDestination
 import com.intellij.refactoring.move.moveClassesOrPackages.MoveClassesOrPackagesUtil
 import com.intellij.refactoring.move.moveFilesOrDirectories.MoveFilesOrDirectoriesUtil
+import com.intellij.refactoring.util.CommonMoveClassesOrPackagesUtil
 import com.intellij.refactoring.util.RefactoringMessageUtil
+import com.intellij.util.CommonJavaRefactoringUtil
 import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.core.findExistingNonGeneratedKotlinSourceRootFiles
 import org.jetbrains.kotlin.idea.core.getFqNameByDirectory
@@ -84,7 +87,7 @@ class PackageDirectoryMismatchInspection : AbstractKotlinInspection() {
             val fileToMove = directive.containingFile
             val chosenRoot =
                 sourceRoots.singleOrNull()
-                    ?: MoveClassesOrPackagesUtil.chooseSourceRoot(packageWrapper, sourceRoots, fileToMove.containingDirectory)
+                    ?: CommonMoveClassesOrPackagesUtil.chooseSourceRoot(packageWrapper, sourceRoots, fileToMove.containingDirectory)
                     ?: return
 
             val targetDirFactory = AutocreatingSingleSourceRootMoveDestination(packageWrapper, chosenRoot)
@@ -115,6 +118,13 @@ class PackageDirectoryMismatchInspection : AbstractKotlinInspection() {
         override fun applyFix(project: Project, descriptor: ProblemDescriptor) {
             val file = descriptor.psiElement as? KtFile ?: return
             KotlinChangePackageRefactoring(file).run(packageFqName)
+        }
+
+        override fun generatePreview(project: Project, previewDescriptor: ProblemDescriptor): IntentionPreviewInfo {
+            val file = previewDescriptor.psiElement as? KtFile ?: return IntentionPreviewInfo.EMPTY
+            val packageDirective = file.packageDirective ?: return IntentionPreviewInfo.EMPTY
+            packageDirective.fqName = packageFqName
+            return IntentionPreviewInfo.DIFF
         }
     }
 }

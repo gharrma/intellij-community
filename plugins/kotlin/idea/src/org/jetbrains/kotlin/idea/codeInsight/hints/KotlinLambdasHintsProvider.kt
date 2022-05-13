@@ -20,7 +20,7 @@ class KotlinLambdasHintsProvider : KotlinAbstractHintsProvider<KotlinLambdasHint
 
     override val key: SettingsKey<Settings> = SettingsKey("kotlin.lambdas.hints")
     override val name: String = KotlinBundle.message("hints.settings.lambdas")
-    override val hintsArePlacedAtTheEndOfLine = true
+    override val hintsArePlacedAtTheEndOfLine = false
 
     override val group: InlayGroup
         get() = InlayGroup.LAMBDAS_GROUP
@@ -48,16 +48,21 @@ class KotlinLambdasHintsProvider : KotlinAbstractHintsProvider<KotlinLambdasHint
                     ImmediateConfigurable.Case(
                         KotlinBundle.message("hints.settings.lambda.return"),
                         "hints.lambda.return",
-                        settings::returnExpressions
+                        settings::returnExpressions,
+                        KotlinBundle.message("inlay.kotlin.lambdas.hints.hints.lambda.return")
                     ),
                     ImmediateConfigurable.Case(
                         KotlinBundle.message("hints.settings.lambda.receivers.parameters"),
                         "hints.lambda.receivers.parameters",
-                        settings::implicitReceiversAndParams
+                        settings::implicitReceiversAndParams,
+                        KotlinBundle.message("inlay.kotlin.lambdas.hints.hints.lambda.receivers.parameters")
                     )
                 )
         }
     }
+
+    override val description: String
+        get() = KotlinBundle.message("inlay.kotlin.lambdas.hints")
 
     override fun createSettings(): Settings = Settings()
 

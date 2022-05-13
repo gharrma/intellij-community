@@ -1,4 +1,4 @@
-// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 
 package org.jetbrains.kotlin.asJava.classes;
 
@@ -19,182 +19,7 @@ import static org.jetbrains.kotlin.idea.artifacts.AdditionalKotlinArtifacts.comp
 @TestDataPath("$CONTENT_ROOT")
 @RunWith(JUnit3RunnerWithInners.class)
 @TestMetadata("../../../../out/kotlinc-testdata/testData/compiler/testData/asJava/lightClasses")
-public class UltraLightClassSanityTestGenerated extends AbstractUltraLightClassSanityTest {
-    private void runTest(String testDataFilePath) throws Exception {
-        KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
-    }
-
-    @Override
-    protected void setUp() {
-        compilerTestData("compiler/testData/asJava/lightClasses");
-        super.setUp();
-    }
-
-    @TestMetadata("AnnotatedParameterInEnumConstructor.kt")
-    public void testAnnotatedParameterInEnumConstructor() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotatedParameterInEnumConstructor.kt"));
-    }
-
-    @TestMetadata("AnnotatedParameterInInnerClassConstructor.kt")
-    public void testAnnotatedParameterInInnerClassConstructor() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotatedParameterInInnerClassConstructor.kt"));
-    }
-
-    @TestMetadata("AnnotatedPropertyWithSites.kt")
-    public void testAnnotatedPropertyWithSites() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotatedPropertyWithSites.kt"));
-    }
-
-    @TestMetadata("AnnotationClass.kt")
-    public void testAnnotationClass() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationClass.kt"));
-    }
-
-    @TestMetadata("AnnotationJvmRepeatable.kt")
-    public void testAnnotationJvmRepeatable() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationJvmRepeatable.kt"));
-    }
-
-    @TestMetadata("AnnotationKotlinAndJavaRepeatable.kt")
-    public void testAnnotationKotlinAndJavaRepeatable() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationKotlinAndJavaRepeatable.kt"));
-    }
-
-    @TestMetadata("AnnotationKotlinAndJvmRepeatable.kt")
-    public void testAnnotationKotlinAndJvmRepeatable() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationKotlinAndJvmRepeatable.kt"));
-    }
-
-    @TestMetadata("AnnotationRepeatable.kt")
-    public void testAnnotationRepeatable() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationRepeatable.kt"));
-    }
-
-    @TestMetadata("Constructors.kt")
-    public void testConstructors() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/Constructors.kt"));
-    }
-
-    @TestMetadata("DataClassWithCustomImplementedMembers.kt")
-    public void testDataClassWithCustomImplementedMembers() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/DataClassWithCustomImplementedMembers.kt"));
-    }
-
-    @TestMetadata("DelegatedNested.kt")
-    public void testDelegatedNested() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/DelegatedNested.kt"));
-    }
-
-    @TestMetadata("Delegation.kt")
-    public void testDelegation() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/Delegation.kt"));
-    }
-
-    @TestMetadata("DeprecatedEnumEntry.kt")
-    public void testDeprecatedEnumEntry() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/DeprecatedEnumEntry.kt"));
-    }
-
-    @TestMetadata("DeprecatedNotHiddenInClass.kt")
-    public void testDeprecatedNotHiddenInClass() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/DeprecatedNotHiddenInClass.kt"));
-    }
-
-    @TestMetadata("DollarsInName.kt")
-    public void testDollarsInName() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/DollarsInName.kt"));
-    }
-
-    @TestMetadata("DollarsInNameNoPackage.kt")
-    public void testDollarsInNameNoPackage() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/DollarsInNameNoPackage.kt"));
-    }
-
-    @TestMetadata("ExtendingInterfaceWithDefaultImpls.kt")
-    public void testExtendingInterfaceWithDefaultImpls() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/ExtendingInterfaceWithDefaultImpls.kt"));
-    }
-
-    @TestMetadata("HiddenDeprecated.kt")
-    public void testHiddenDeprecated() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/HiddenDeprecated.kt"));
-    }
-
-    @TestMetadata("HiddenDeprecatedInClass.kt")
-    public void testHiddenDeprecatedInClass() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/HiddenDeprecatedInClass.kt"));
-    }
-
-    @TestMetadata("InheritingInterfaceDefaultImpls.kt")
-    public void testInheritingInterfaceDefaultImpls() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/InheritingInterfaceDefaultImpls.kt"));
-    }
-
-    @TestMetadata("InlineReified.kt")
-    public void testInlineReified() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/InlineReified.kt"));
-    }
-
-    @TestMetadata("JvmNameOnMember.kt")
-    public void testJvmNameOnMember() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/JvmNameOnMember.kt"));
-    }
-
-    @TestMetadata("JvmStatic.kt")
-    public void testJvmStatic() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/JvmStatic.kt"));
-    }
-
-    @TestMetadata("LocalFunctions.kt")
-    public void testLocalFunctions() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/LocalFunctions.kt"));
-    }
-
-    @TestMetadata("NestedObjects.kt")
-    public void testNestedObjects() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/NestedObjects.kt"));
-    }
-
-    @TestMetadata("NonDataClassWithComponentFunctions.kt")
-    public void testNonDataClassWithComponentFunctions() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/NonDataClassWithComponentFunctions.kt"));
-    }
-
-    @TestMetadata("OnlySecondaryConstructors.kt")
-    public void testOnlySecondaryConstructors() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/OnlySecondaryConstructors.kt"));
-    }
-
-    @TestMetadata("PublishedApi.kt")
-    public void testPublishedApi() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/PublishedApi.kt"));
-    }
-
-    @TestMetadata("SpecialAnnotationsOnAnnotationClass.kt")
-    public void testSpecialAnnotationsOnAnnotationClass() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/SpecialAnnotationsOnAnnotationClass.kt"));
-    }
-
-    @TestMetadata("SpecialAnnotationsOnAnnotationClass_1_6.kt")
-    public void testSpecialAnnotationsOnAnnotationClass_1_6() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/SpecialAnnotationsOnAnnotationClass_1_6.kt"));
-    }
-
-    @TestMetadata("StubOrderForOverloads.kt")
-    public void testStubOrderForOverloads() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/StubOrderForOverloads.kt"));
-    }
-
-    @TestMetadata("TypePararametersInClass.kt")
-    public void testTypePararametersInClass() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/TypePararametersInClass.kt"));
-    }
-
-    @TestMetadata("VarArgs.kt")
-    public void testVarArgs() throws Exception {
-        runTest(compilerTestData("compiler/testData/asJava/lightClasses/VarArgs.kt"));
-    }
-
+public abstract class UltraLightClassSanityTestGenerated extends AbstractUltraLightClassSanityTest {
     @RunWith(JUnit3RunnerWithInners.class)
     @TestMetadata("../../../../out/kotlinc-testdata/testData/compiler/testData/asJava/lightClasses/compilationErrors")
     public static class CompilationErrors extends AbstractUltraLightClassSanityTest {
@@ -609,6 +434,179 @@ public class UltraLightClassSanityTestGenerated extends AbstractUltraLightClassS
         @TestMetadata("InnerClasses.kts")
         public void testInnerClasses() throws Exception {
             runTest(compilerTestData("compiler/testData/asJava/lightClasses/script/InnerClasses.kts"));
+        }
+    }
+
+    @RunWith(JUnit3RunnerWithInners.class)
+    @TestMetadata("../../../../out/kotlinc-testdata/testData/compiler/testData/asJava/lightClasses")
+    public static class Uncategorized extends AbstractUltraLightClassSanityTest {
+        private void runTest(String testDataFilePath) throws Exception {
+            KotlinTestUtils.runTest(this::doTest, this, testDataFilePath);
+        }
+
+        @TestMetadata("AnnotatedParameterInEnumConstructor.kt")
+        public void testAnnotatedParameterInEnumConstructor() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotatedParameterInEnumConstructor.kt"));
+        }
+
+        @TestMetadata("AnnotatedParameterInInnerClassConstructor.kt")
+        public void testAnnotatedParameterInInnerClassConstructor() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotatedParameterInInnerClassConstructor.kt"));
+        }
+
+        @TestMetadata("AnnotatedPropertyWithSites.kt")
+        public void testAnnotatedPropertyWithSites() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotatedPropertyWithSites.kt"));
+        }
+
+        @TestMetadata("AnnotationClass.kt")
+        public void testAnnotationClass() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationClass.kt"));
+        }
+
+        @TestMetadata("AnnotationJvmRepeatable.kt")
+        public void testAnnotationJvmRepeatable() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationJvmRepeatable.kt"));
+        }
+
+        @TestMetadata("AnnotationKotlinAndJavaRepeatable.kt")
+        public void testAnnotationKotlinAndJavaRepeatable() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationKotlinAndJavaRepeatable.kt"));
+        }
+
+        @TestMetadata("AnnotationKotlinAndJvmRepeatable.kt")
+        public void testAnnotationKotlinAndJvmRepeatable() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationKotlinAndJvmRepeatable.kt"));
+        }
+
+        @TestMetadata("AnnotationRepeatable.kt")
+        public void testAnnotationRepeatable() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/AnnotationRepeatable.kt"));
+        }
+
+        @TestMetadata("Constructors.kt")
+        public void testConstructors() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/Constructors.kt"));
+        }
+
+        @TestMetadata("DataClassWithCustomImplementedMembers.kt")
+        public void testDataClassWithCustomImplementedMembers() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/DataClassWithCustomImplementedMembers.kt"));
+        }
+
+        @TestMetadata("DelegatedNested.kt")
+        public void testDelegatedNested() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/DelegatedNested.kt"));
+        }
+
+        @TestMetadata("Delegation.kt")
+        public void testDelegation() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/Delegation.kt"));
+        }
+
+        @TestMetadata("DeprecatedEnumEntry.kt")
+        public void testDeprecatedEnumEntry() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/DeprecatedEnumEntry.kt"));
+        }
+
+        @TestMetadata("DeprecatedNotHiddenInClass.kt")
+        public void testDeprecatedNotHiddenInClass() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/DeprecatedNotHiddenInClass.kt"));
+        }
+
+        @TestMetadata("DollarsInName.kt")
+        public void testDollarsInName() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/DollarsInName.kt"));
+        }
+
+        @TestMetadata("DollarsInNameNoPackage.kt")
+        public void testDollarsInNameNoPackage() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/DollarsInNameNoPackage.kt"));
+        }
+
+        @TestMetadata("ExtendingInterfaceWithDefaultImpls.kt")
+        public void testExtendingInterfaceWithDefaultImpls() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/ExtendingInterfaceWithDefaultImpls.kt"));
+        }
+
+        @TestMetadata("HiddenDeprecated.kt")
+        public void testHiddenDeprecated() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/HiddenDeprecated.kt"));
+        }
+
+        @TestMetadata("HiddenDeprecatedInClass.kt")
+        public void testHiddenDeprecatedInClass() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/HiddenDeprecatedInClass.kt"));
+        }
+
+        @TestMetadata("InheritingInterfaceDefaultImpls.kt")
+        public void testInheritingInterfaceDefaultImpls() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/InheritingInterfaceDefaultImpls.kt"));
+        }
+
+        @TestMetadata("InlineReified.kt")
+        public void testInlineReified() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/InlineReified.kt"));
+        }
+
+        @TestMetadata("JvmNameOnMember.kt")
+        public void testJvmNameOnMember() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/JvmNameOnMember.kt"));
+        }
+
+        @TestMetadata("JvmStatic.kt")
+        public void testJvmStatic() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/JvmStatic.kt"));
+        }
+
+        @TestMetadata("LocalFunctions.kt")
+        public void testLocalFunctions() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/LocalFunctions.kt"));
+        }
+
+        @TestMetadata("NestedObjects.kt")
+        public void testNestedObjects() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/NestedObjects.kt"));
+        }
+
+        @TestMetadata("NonDataClassWithComponentFunctions.kt")
+        public void testNonDataClassWithComponentFunctions() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/NonDataClassWithComponentFunctions.kt"));
+        }
+
+        @TestMetadata("OnlySecondaryConstructors.kt")
+        public void testOnlySecondaryConstructors() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/OnlySecondaryConstructors.kt"));
+        }
+
+        @TestMetadata("PublishedApi.kt")
+        public void testPublishedApi() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/PublishedApi.kt"));
+        }
+
+        @TestMetadata("SpecialAnnotationsOnAnnotationClass.kt")
+        public void testSpecialAnnotationsOnAnnotationClass() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/SpecialAnnotationsOnAnnotationClass.kt"));
+        }
+
+        @TestMetadata("SpecialAnnotationsOnAnnotationClass_1_6.kt")
+        public void testSpecialAnnotationsOnAnnotationClass_1_6() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/SpecialAnnotationsOnAnnotationClass_1_6.kt"));
+        }
+
+        @TestMetadata("StubOrderForOverloads.kt")
+        public void testStubOrderForOverloads() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/StubOrderForOverloads.kt"));
+        }
+
+        @TestMetadata("TypePararametersInClass.kt")
+        public void testTypePararametersInClass() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/TypePararametersInClass.kt"));
+        }
+
+        @TestMetadata("VarArgs.kt")
+        public void testVarArgs() throws Exception {
+            runTest(compilerTestData("compiler/testData/asJava/lightClasses/VarArgs.kt"));
         }
     }
 }

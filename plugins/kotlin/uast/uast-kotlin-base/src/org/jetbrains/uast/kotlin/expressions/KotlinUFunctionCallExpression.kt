@@ -50,12 +50,11 @@ class KotlinUFunctionCallExpression(
             }
             is KtLambdaExpression ->
                 KotlinUIdentifier(calleeExpression.functionLiteral.lBrace, this)
-            else ->
-                KotlinUIdentifier(
-                    sourcePsi.valueArgumentList?.leftParenthesis
-                        ?: sourcePsi.lambdaArguments.singleOrNull()?.getLambdaExpression()?.functionLiteral?.lBrace
-                        ?: calleeExpression, this
-                )
+            else -> KotlinUIdentifier(
+                sourcePsi.valueArgumentList?.leftParenthesis
+                    ?: sourcePsi.lambdaArguments.singleOrNull()?.getLambdaExpression()?.functionLiteral?.lBrace
+                    ?: sourcePsi.typeArgumentList?.firstChild
+                    ?: calleeExpression, this)
         }
     }
 

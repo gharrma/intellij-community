@@ -1,4 +1,4 @@
-// WITH_RUNTIME
+// WITH_STDLIB
 fun unrelatedTypes(obj : Any) {
     if (obj is X) {
         if (<warning descr="[USELESS_IS_CHECK] Check for instance is always 'false'">obj is Y</warning>) { }

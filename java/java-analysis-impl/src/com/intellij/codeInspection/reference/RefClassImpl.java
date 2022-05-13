@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.codeInspection.reference;
 
 import com.intellij.codeInsight.TestFrameworks;
@@ -50,6 +50,10 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
   RefClassImpl(UClass uClass, PsiElement psi, RefManager manager) {
     super(uClass, psi, manager);
     myRefModule = manager.getRefModule(ModuleUtilCore.findModuleForPsiElement(psi));
+
+    setInterface(uClass.isInterface());
+    setAbstract(uClass.getJavaPsi().hasModifier(JvmModifier.ABSTRACT));
+    setAnonymous(uClass.getName() == null);
   }
 
   @Override
@@ -94,13 +98,7 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
 
     if (!myManager.isDeclarationsFound()) return;
 
-    PsiClass javaPsi = uClass.getJavaPsi();
-    setAbstract(javaPsi.hasModifier(JvmModifier.ABSTRACT));
-    setAnonymous(uClass.getName() == null);
-
     setIsLocal(!isAnonymous() && parent != null && !(parent instanceof UClass));
-
-    setInterface(uClass.isInterface());
 
     initializeSuperReferences(uClass);
 
@@ -110,7 +108,7 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
     boolean utilityClass = uMethods.length > 0 || uFields.length > 0;
 
     for (UField uField : uFields) {
-      final RefElement field = getRefManager().getReference(uField.getSourcePsi());
+      final RefField field = ObjectUtils.tryCast(getRefManager().getReference(uField.getSourcePsi()), RefField.class);
       if (field != null) addChild(field);
     }
     RefMethod varargConstructor = null;
@@ -172,7 +170,7 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
     if (!utilityClass) {
       setApplet(getRefJavaManager().getApplet() != null && JvmInheritanceUtil.isInheritor(uClass, getRefJavaManager().getAppletQName()));
       if (!isApplet()) {
-        setServlet(JvmInheritanceUtil.isInheritor(javaPsi, getRefJavaManager().getServletQName()));
+        setServlet(JvmInheritanceUtil.isInheritor(uClass.getJavaPsi(), getRefJavaManager().getServletQName()));
       }
       if (!isApplet() && !isServlet()) {
         PsiElement psi = uClass.getSourcePsi();
@@ -253,23 +251,25 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
   public void buildReferences() {
     UClass uClass = getUastElement();
     if (uClass != null) {
+      final PsiElement classSourcePsi = uClass.getSourcePsi();
+      final RefJavaUtil refUtil = RefJavaUtil.getInstance();
       if (uClass instanceof UAnonymousClass) {
         UObjectLiteralExpression objectAccess = UastUtils.getParentOfType(uClass, UObjectLiteralExpression.class);
-        if (objectAccess != null && objectAccess.getDeclaration().getSourcePsi() == uClass.getSourcePsi()) {
-          RefJavaUtil.getInstance().addReferencesTo(uClass, this, objectAccess.getValueArguments().toArray(UElementKt.EMPTY_ARRAY));
+        if (objectAccess != null && objectAccess.getDeclaration().getSourcePsi() == classSourcePsi) {
+          refUtil.addReferencesTo(uClass, this, objectAccess.getValueArguments().toArray(UElementKt.EMPTY_ARRAY));
         }
       }
 
       for (UClassInitializer classInitializer : uClass.getInitializers()) {
-        RefJavaUtil.getInstance().addReferencesTo(uClass, this, classInitializer.getUastBody());
+        refUtil.addReferencesTo(uClass, this, classInitializer.getUastBody());
       }
 
-      RefJavaUtil.getInstance().addReferencesTo(uClass, this, uClass.getUAnnotations().toArray(UElementKt.EMPTY_ARRAY));
+      refUtil.addReferencesTo(uClass, this, uClass.getUAnnotations().toArray(UElementKt.EMPTY_ARRAY));
 
       for (PsiTypeParameter parameter : uClass.getJavaPsi().getTypeParameters()) {
         UElement uTypeParameter = UastContextKt.toUElement(parameter);
         if (uTypeParameter != null) {
-          RefJavaUtil.getInstance().addReferencesTo(uClass, this, uTypeParameter);
+          refUtil.addReferencesTo(uClass, this, uTypeParameter);
         }
       }
 
@@ -277,7 +277,7 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
       for (UField uField : uFields) {
         final UExpression initializer = uField.getUastInitializer();
         if (initializer != null) {
-          RefJavaUtil.getInstance().addReferencesTo(uClass, this, initializer);
+          refUtil.addReferencesTo(uClass, this, initializer);
         }
       }
 
@@ -295,7 +295,13 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
         }
       }
 
-      RefJavaUtil.getInstance().addReferencesTo(uClass, this, uClass.getUastSuperTypes().toArray(UElementKt.EMPTY_ARRAY));
+      UMethod[] uMethods = uClass.getMethods();
+      for (UMethod uMethod : uMethods) {
+        if (uMethod.getSourcePsi() == classSourcePsi) {
+          refUtil.addReferencesTo(uClass, this, uMethod.getUastBody());
+        }
+      }
+      refUtil.addReferencesTo(uClass, this, uClass.getUastSuperTypes().toArray(UElementKt.EMPTY_ARRAY));
 
       getRefManager().fireBuildReferences(this);
     }
@@ -436,7 +442,7 @@ public final class RefClassImpl extends RefJavaElementImpl implements RefClass {
   public String getExternalName() {
     return ReadAction.compute(() -> {//todo synthetic JSP
       final UClass psiClass = getUastElement();
-      LOG.assertTrue(psiClass != null);
+      LOG.assertTrue(psiClass != null, "No uast class found for psi: " + getPsiElement());
       return PsiFormatUtil.getExternalName(psiClass.getJavaPsi());
     });
   }

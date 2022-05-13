@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.debugger.impl;
 
 import com.intellij.configurationStore.XmlSerializer;
@@ -22,6 +22,7 @@ import com.intellij.ide.util.TreeClassChooser;
 import com.intellij.ide.util.TreeClassChooserFactory;
 import com.intellij.openapi.actionSystem.DataContext;
 import com.intellij.openapi.diagnostic.Logger;
+import com.intellij.openapi.extensions.ExtensionPointName;
 import com.intellij.openapi.progress.ProcessCanceledException;
 import com.intellij.openapi.project.Project;
 import com.intellij.openapi.projectRoots.ex.JavaSdkUtil;
@@ -35,7 +36,9 @@ import com.intellij.psi.search.GlobalSearchScope;
 import com.intellij.psi.util.PsiUtil;
 import com.intellij.rt.execution.CommandLineWrapper;
 import com.intellij.util.ObjectUtils;
+import com.intellij.util.Range;
 import com.intellij.util.SmartList;
+import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.URLUtil;
 import com.intellij.util.net.NetUtils;
 import com.intellij.xdebugger.XDebugSession;
@@ -43,6 +46,7 @@ import com.intellij.xdebugger.XExpression;
 import com.intellij.xdebugger.impl.XDebugSessionImpl;
 import com.intellij.xdebugger.impl.breakpoints.XExpressionState;
 import com.intellij.xdebugger.impl.frame.XValueMarkers;
+import com.jetbrains.jdi.LocalVariableImpl;
 import com.sun.jdi.*;
 import com.sun.jdi.connect.Connector;
 import com.sun.jdi.connect.IllegalConnectorArgumentsException;
@@ -60,6 +64,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import java.util.stream.Stream;
 
 public class DebuggerUtilsImpl extends DebuggerUtilsEx{
@@ -387,6 +392,28 @@ public class DebuggerUtilsImpl extends DebuggerUtilsEx{
     return res;
   }
 
+  private static CompletableFuture<NodeRenderer> getFirstApplicableRenderer(List<CompletableFuture<Boolean>> futures,
+                                                                            int index,
+                                                                            List<NodeRenderer> renderers) {
+    if (index >= futures.size()) {
+      return CompletableFuture.completedFuture(null);
+    }
+    return futures.get(index).thenCompose(res -> {
+      if (res) {
+        return CompletableFuture.completedFuture(renderers.get(index));
+      }
+      else {
+        return getFirstApplicableRenderer(futures, index + 1, renderers);
+      }
+    });
+  }
+
+  @NotNull
+  public static CompletableFuture<NodeRenderer> getFirstApplicableRenderer(List<NodeRenderer> renderers, Type type) {
+    DebuggerManagerThreadImpl.assertIsManagerThread();
+    return getFirstApplicableRenderer(ContainerUtil.map(renderers, r -> r.isApplicableAsync(type)), 0, renderers);
+  }
+
   @NotNull
   public static CompletableFuture<List<NodeRenderer>> getApplicableRenderers(List<NodeRenderer> renderers, Type type) {
     DebuggerManagerThreadImpl.assertIsManagerThread();
@@ -418,18 +445,55 @@ public class DebuggerUtilsImpl extends DebuggerUtilsEx{
     return null;
   }
 
-  //TODO: use more general utils when available
+  // do not catch VMDisconnectedException
+  public static <T> void forEachSafe(ExtensionPointName<T> ep, Consumer<T> action) {
+    forEachSafe(ep.getIterable(), action);
+  }
+
+  // do not catch VMDisconnectedException
   public static <T> void forEachSafe(Iterable<T> iterable, Consumer<T> action) {
     for (T o : iterable) {
       try {
         action.accept(o);
       }
-      catch (ProcessCanceledException e) {
+      catch (VMDisconnectedException | ProcessCanceledException e) {
         throw e;
       }
       catch (Throwable e) {
         LOG.error(e);
       }
     }
+  }
+
+  // do not catch VMDisconnectedException
+  public static <T, R> R computeSafeIfAny(ExtensionPointName<T> ep, @NotNull Function<? super T, ? extends R> processor) {
+    for (T t : ep.getIterable()) {
+      if (t == null) {
+        return null;
+      }
+
+      try {
+        R result = processor.apply(t);
+        if (result != null) {
+          return result;
+        }
+      }
+      catch (VMDisconnectedException | ProcessCanceledException e) {
+        throw e;
+      }
+      catch (Exception e) {
+        LOG.error(e);
+      }
+    }
+
+    return null;
+  }
+
+
+  @Nullable
+  public static Range<Location> getLocalVariableBorders(@NotNull LocalVariable variable) {
+    if (!(variable instanceof LocalVariableImpl)) return null;
+    LocalVariableImpl variableImpl = (LocalVariableImpl)variable;
+    return new Range<>(variableImpl.getScopeStart(), variableImpl.getScopeEnd());
   }
 }

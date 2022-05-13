@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.actionMacro;
 
 import com.intellij.icons.AllIcons;
@@ -31,16 +31,16 @@ import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.NlsActions.ActionText;
 import com.intellij.openapi.util.NlsContexts;
 import com.intellij.openapi.util.registry.Registry;
-import com.intellij.openapi.wm.*;
+import com.intellij.openapi.wm.CustomStatusBarWidget;
+import com.intellij.openapi.wm.IdeFrame;
+import com.intellij.openapi.wm.StatusBar;
+import com.intellij.openapi.wm.WindowManager;
 import com.intellij.ui.AnimatedIcon.Recording;
 import com.intellij.ui.awt.RelativePoint;
 import com.intellij.ui.components.panels.NonOpaquePanel;
 import com.intellij.util.Consumer;
 import com.intellij.util.concurrency.NonUrgentExecutor;
-import com.intellij.util.ui.AnimatedIcon;
-import com.intellij.util.ui.BaseButtonBehavior;
-import com.intellij.util.ui.PositionTracker;
-import com.intellij.util.ui.UIUtil;
+import com.intellij.util.ui.*;
 import org.jdom.Element;
 import org.jetbrains.annotations.Nls;
 import org.jetbrains.annotations.NonNls;
@@ -53,7 +53,6 @@ import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.util.*;
-import java.util.List;
 
 @State(name = "ActionMacroManager", storages = @Storage("macros.xml"), category = SettingsCategory.UI)
 public final class ActionMacroManager implements PersistentStateComponent<Element>, Disposable {
@@ -141,12 +140,21 @@ public final class ActionMacroManager implements PersistentStateComponent<Elemen
     return ApplicationManager.getApplication().getService(ActionMacroManager.class);
   }
 
-  public void startRecording(String macroName) {
+  public void startRecording(Project project, String macroName) {
     LOG.assertTrue(!myIsRecording);
     myIsRecording = true;
     myRecordingMacro = new ActionMacro(macroName);
 
-    StatusBar statusBar = WindowManager.getInstance().getIdeFrame(null).getStatusBar();
+    IdeFrame frame = WindowManager.getInstance().getIdeFrame(project);
+    if (frame == null) {
+      LOG.warn("Cannot start macro recording: ide frame not found");
+      return;
+    }
+    StatusBar statusBar = frame.getStatusBar();
+    if (statusBar == null) {
+      LOG.warn("Cannot start macro recording: status bar not found");
+      return;
+    }
     myWidget = new Widget(statusBar);
     statusBar.addWidget(myWidget);
   }
@@ -165,7 +173,7 @@ public final class ActionMacroManager implements PersistentStateComponent<Elemen
 
     private Widget(StatusBar statusBar) {
       myStatusBar = statusBar;
-      myIcon.setBorder(StatusBarWidget.WidgetBorder.ICON);
+      myIcon.setBorder(JBUI.CurrentTheme.StatusBar.Widget.iconBorder());
       myPresentation = new WidgetPresentation() {
         @Override
         public String getTooltipText() {
@@ -303,12 +311,12 @@ public final class ActionMacroManager implements PersistentStateComponent<Elemen
 
     myIsRecording = false;
     myLastActionInputEvent.clear();
-    String macroName;
+    String macroName = "";
     do {
       macroName = Messages.showInputDialog(project,
                                            IdeBundle.message("prompt.enter.macro.name"),
                                            IdeBundle.message("title.enter.macro.name"),
-                                           Messages.getQuestionIcon());
+                                           Messages.getQuestionIcon(), macroName, null);
       if (macroName == null) {
         myRecordingMacro = null;
         return;
@@ -316,7 +324,7 @@ public final class ActionMacroManager implements PersistentStateComponent<Elemen
 
       if (macroName.isEmpty()) macroName = null;
     }
-    while (macroName != null && !checkCanCreateMacro(macroName));
+    while (macroName != null && !checkCanCreateMacro(project, macroName));
 
     myLastMacro = myRecordingMacro;
     addRecordedMacroWithName(macroName);
@@ -462,14 +470,12 @@ public final class ActionMacroManager implements PersistentStateComponent<Elemen
 
     // fix references to and icons of renamed macros in the custom actions schema
     final CustomActionsSchema customActionsSchema = CustomActionsSchema.getInstance();
-    final List<ActionUrl> actions = customActionsSchema.getActions();
-    for (final ActionUrl actionUrl : actions) {
+    for (ActionUrl actionUrl : customActionsSchema.getActions()) {
       final String newId = renamingMap.get(actionUrl.getComponent());
       if (newId != null) {
         actionUrl.setComponent(newId);
       }
     }
-    customActionsSchema.setActions(actions);
     for (Map.Entry<String, String> entry : renamingMap.entrySet()) {
       final String oldId = entry.getKey();
       final String path = customActionsSchema.getIconPath(oldId);
@@ -479,15 +485,15 @@ public final class ActionMacroManager implements PersistentStateComponent<Elemen
         customActionsSchema.addIconCustomization(newId, path);
       }
     }
-    CustomActionsSchema.setCustomizationSchemaForCurrentProjects();
+    if (!renamingMap.isEmpty()) CustomActionsSchema.setCustomizationSchemaForCurrentProjects();
   }
 
-  public boolean checkCanCreateMacro(String name) {
+  private boolean checkCanCreateMacro(Project project, String name) {
     final ActionManagerEx actionManager = (ActionManagerEx)ActionManager.getInstance();
     final String actionId = ActionMacro.MACRO_ACTION_PREFIX + name;
     if (actionManager.getAction(actionId) != null) {
       if (!MessageDialogBuilder.yesNo(IdeBundle.message("title.macro.name.already.used"), IdeBundle.message("message.macro.exists", name))
-            .icon(Messages.getWarningIcon()).ask(myWidget.getComponent())) {
+            .icon(Messages.getWarningIcon()).ask(project)) {
         return false;
       }
       actionManager.unregisterAction(actionId);

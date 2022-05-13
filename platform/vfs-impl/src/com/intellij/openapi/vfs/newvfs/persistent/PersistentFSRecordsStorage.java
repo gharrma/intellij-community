@@ -2,12 +2,13 @@
 package com.intellij.openapi.vfs.newvfs.persistent;
 
 import com.intellij.openapi.util.ThrowableComputable;
+import com.intellij.util.io.IOUtil;
 import com.intellij.util.io.ResizeableMappedFile;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
-import java.util.concurrent.locks.ReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 
 public final class PersistentFSRecordsStorage {
   private static final int PARENT_OFFSET = 0;
@@ -30,25 +31,23 @@ public final class PersistentFSRecordsStorage {
   static final int RECORD_SIZE = LENGTH_OFFSET + LENGTH_SIZE;
   private static final byte[] ZEROES = new byte[RECORD_SIZE];
 
-  private final ReadWriteLock myLock = new ReentrantReadWriteLock();
-
   private <V, E extends Throwable> V read(ThrowableComputable<V, E> action) throws E {
-    myLock.readLock().lock();
+    myFile.getStorageLockContext().lockRead();
     try {
       return action.compute();
     }
     finally {
-      myLock.readLock().unlock();
+      myFile.getStorageLockContext().unlockRead();
     }
   }
 
   private <V, E extends Throwable> V write(ThrowableComputable<V, E> action) throws E {
-    myLock.writeLock().lock();
+    myFile.getStorageLockContext().lockWrite();
     try {
       return action.compute();
     }
     finally {
-      myLock.writeLock().unlock();
+      myFile.getStorageLockContext().unlockWrite();
     }
   }
 
@@ -277,5 +276,35 @@ public final class PersistentFSRecordsStorage {
 
   boolean isDirty() {
     return myFile.isDirty();
+  }
+
+  void processAllNames(@NotNull NameFlagsProcessor operator) throws IOException {
+    read(() -> {
+      myFile.force();
+      return myFile.readChannel(ch -> {
+        ByteBuffer buffer = ByteBuffer.allocateDirect(RECORD_SIZE * 1024);
+        if (IOUtil.useNativeByteOrderForByteBuffers()) buffer.order(ByteOrder.nativeOrder());
+        try {
+          int id = 1, limit, offset;
+          while ((limit = ch.read(buffer)) >= RECORD_SIZE) {
+            offset = id == 1 ? RECORD_SIZE : 0; // skip header
+            for (; offset < limit; offset += RECORD_SIZE) {
+              int nameId = buffer.getInt(offset + NAME_OFFSET);
+              int flags = buffer.getInt(offset + FLAGS_OFFSET);
+              operator.process(id, nameId, flags);
+              id ++;
+            }
+            buffer.position(0);
+          }
+        }
+        catch (IOException ignore) {
+        }
+        return true;
+      });
+    });
+  }
+
+  interface NameFlagsProcessor {
+    void process(int fileId, int nameId, int flags);
   }
 }

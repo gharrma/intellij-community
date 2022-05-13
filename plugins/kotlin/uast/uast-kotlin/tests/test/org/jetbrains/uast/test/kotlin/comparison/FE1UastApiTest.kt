@@ -188,6 +188,11 @@ class FE1UastApiTest : AbstractFE1UastTest() {
             doTest("LambdaParameters", ::checkCallbackForLambdaParameters)
         }
 
+        @TestMetadata("ComplicatedTypes.kt")
+        fun testComplicatedTypes() {
+            doTest("ComplicatedTypes", ::checkCallbackForComplicatedTypes)
+        }
+
         @TestMetadata("SAM.kt")
         fun testSAM() {
             doTest("SAM", ::checkCallbackForSAM)

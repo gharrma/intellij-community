@@ -1258,6 +1258,14 @@ class KotlinChangeSignatureTest : KotlinLightCodeInsightFixtureTestCase() {
         newReturnTypeInfo = KotlinTypeInfo(true, BUILT_INS.stringType)
     }
 
+    fun testChangeClassParameterWithInvalidCharacter() = doTest {
+        newParameters[0].name = "a@bc"
+    }
+
+    fun testChangeClassParameterWithEscapedName() = doTest {
+        newParameters[0].name = "`x@yz`"
+    }
+
     fun testParameterPropagation() = doTestAndIgnoreConflicts {
         val psiFactory = KtPsiFactory(project)
 
@@ -1290,7 +1298,7 @@ class KotlinChangeSignatureTest : KotlinLightCodeInsightFixtureTestCase() {
         newParameters.add(ParameterInfoImpl(-1, "n", PsiType.INT, "1"))
         newParameters.add(ParameterInfoImpl(-1, "s", stringPsiType, "\"abc\""))
 
-        val classA = JavaFullClassNameIndex.getInstance().get("A".hashCode(), project, project.allScope()).first { it.name == "A" }
+        val classA = JavaFullClassNameIndex.getInstance().get("A", project, project.allScope()).first { it.name == "A" }
         val methodBar = classA.methods.first { it.name == "bar" }
         parameterPropagationTargets.add(methodBar)
 

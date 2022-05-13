@@ -16,14 +16,11 @@ import org.jetbrains.kotlin.idea.KotlinBundle
 import org.jetbrains.kotlin.idea.caches.resolve.analyze
 import org.jetbrains.kotlin.idea.caches.resolve.resolveToDescriptorIfAny
 import org.jetbrains.kotlin.idea.refactoring.canRefactor
-import org.jetbrains.kotlin.idea.util.application.runWriteAction
+import org.jetbrains.kotlin.idea.util.application.runWriteActionIfPhysical
 import org.jetbrains.kotlin.idea.util.collectAllExpectAndActualDeclaration
 import org.jetbrains.kotlin.lexer.KtModifierKeywordToken
 import org.jetbrains.kotlin.lexer.KtTokens.*
-import org.jetbrains.kotlin.psi.KtClass
-import org.jetbrains.kotlin.psi.KtDeclaration
-import org.jetbrains.kotlin.psi.KtModifierListOwner
-import org.jetbrains.kotlin.psi.KtTypeReference
+import org.jetbrains.kotlin.psi.*
 import org.jetbrains.kotlin.psi.psiUtil.hasActualModifier
 import org.jetbrains.kotlin.psi.psiUtil.hasExpectModifier
 import org.jetbrains.kotlin.resolve.BindingContext
@@ -36,7 +33,6 @@ open class AddModifierFixFE10(
     element: KtModifierListOwner,
     modifier: KtModifierKeywordToken
 ) : AddModifierFix(element, modifier) {
-
     override fun startInWriteAction(): Boolean = !modifier.isMultiplatformPersistent() ||
             (element?.hasActualModifier() != true && element?.hasExpectModifier() != true)
 
@@ -53,7 +49,7 @@ open class AddModifierFixFE10(
                 if (!dialog.ask(project)) return
             }
 
-            runWriteAction {
+            runWriteActionIfPhysical(originalElement) {
                 for (declaration in elementsToMutate) {
                     invokeOnElement(declaration)
                 }

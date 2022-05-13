@@ -5,10 +5,10 @@ package org.jetbrains.kotlin.idea.debugger
 import com.intellij.debugger.jdi.LocalVariableProxyImpl
 import com.intellij.debugger.jdi.StackFrameProxyImpl
 import com.sun.jdi.LocalVariable
-import com.sun.jdi.Location
 import org.jetbrains.kotlin.codegen.AsmUtil
 import org.jetbrains.kotlin.codegen.inline.INLINE_FUN_VAR_SUFFIX
 import org.jetbrains.kotlin.codegen.inline.isFakeLocalVariableForInline
+import org.jetbrains.kotlin.idea.debugger.DebuggerUtils.getBorders
 import org.jetbrains.kotlin.load.java.JvmAbi.LOCAL_VARIABLE_NAME_PREFIX_INLINE_ARGUMENT
 import org.jetbrains.kotlin.load.java.JvmAbi.LOCAL_VARIABLE_NAME_PREFIX_INLINE_FUNCTION
 
@@ -32,7 +32,7 @@ val INLINED_THIS_REGEX = run {
  * stack frames.
  */
 class InlineStackFrameVariableHolder private constructor(
-    // Visible variables sorted by start offset.
+    // Visible variables sorted by start offset. May contain duplicate variable names.
     private val sortedVariables: List<LocalVariableProxyImpl>,
     // Map from variable index to frame id. Every frame corresponds to a call to
     // a Kotlin (inline) function.
@@ -40,14 +40,20 @@ class InlineStackFrameVariableHolder private constructor(
     private val currentFrameId: Int,
 ) {
     // Returns all variables which are visible in the scope of the current (inline) function.
-    // This function hides scope introduction variables and strips inline metadata suffixes.
     val visibleVariables: List<LocalVariableProxyImpl>
-        get() = sortedVariables.mapIndexedNotNull { index, variable ->
-            if (variableFrameIds[index] == currentFrameId) {
-                variable
-            } else {
-                null
+        get() {
+            val variables = mutableListOf<LocalVariableProxyImpl>()
+            val variableNames = mutableSetOf<String>()
+            for ((index, variable) in sortedVariables.withIndex().reversed()) {
+                if (variableFrameIds[index] != currentFrameId)
+                    continue
+
+                if (variable.name() !in variableNames) {
+                    variables += variable
+                    variableNames += variable.name()
+                }
             }
+            return variables.reversed()
         }
 
     val parentFrame: InlineStackFrameVariableHolder?
@@ -147,9 +153,9 @@ class InlineStackFrameVariableHolder private constructor(
                     // point, since arguments to an inline function argument would be
                     // associated with a previous active frame.
                     //
-                    // If we do encounter pending variables, then they belong to an
-                    // inline call whose scope introduction variable was shadowed by
-                    // a later call to the same function and can be hidden.
+                    // If we do encounter pending variables, then this indicates that the
+                    // debug information is inconsistent and we mark all pending variables
+                    // as invalid.
                     name.startsWith(LOCAL_VARIABLE_NAME_PREFIX_INLINE_ARGUMENT) -> {
                         for (pending in pendingVariables) {
                             variableFrameIds[pending] = -1
@@ -170,10 +176,8 @@ class InlineStackFrameVariableHolder private constructor(
                         if (depth == activeFrames.size) {
                             pendingVariables += currentIndex
                         } else {
-                            // This can only happen if we skipped a scope introduction
-                            // variable due to shadowing by a later call to the same
-                            // function. In particular, the current index is not in
-                            // scope and can be hidden.
+                            // This can only happen if the debug information is invalid. In
+                            // particular, the current index is not in scope and can be hidden.
                             variableFrameIds[currentIndex] = -1
                         }
                     }
@@ -191,7 +195,7 @@ class InlineStackFrameVariableHolder private constructor(
             // On the JVM the variable start offsets correspond to the introduction order,
             // so we can proceed directly.
             if (allVariables == null) {
-                val sortedVariables = frame.visibleVariables().sortedBy { it.variable }
+                val sortedVariables = frame.allVisibleVariables().sortedBy { it.variable }
                 return fromSortedVisibleVariables(sortedVariables)
             }
 
@@ -208,11 +212,11 @@ class InlineStackFrameVariableHolder private constructor(
             val startOffsets = mutableMapOf<Long, MutableList<LocalVariable>>()
             val replacements = mutableMapOf<LocalVariable, LocalVariable>()
             for (variable in allVariables) {
-                val startOffset = variable.getFieldValue("scopeStart") as Location
+                val startOffset = variable.getBorders()?.start ?: continue
                 startOffsets.computeIfAbsent(startOffset.codeIndex()) { mutableListOf() } += variable
             }
             for (variable in allVariables) {
-                val endOffset = variable.getFieldValue("scopeEnd") as Location
+                val endOffset = variable.getBorders()?.endInclusive ?: continue
                 val otherVariables = startOffsets[endOffset.codeIndex() + 1] ?: continue
                 for (other in otherVariables) {
                     if (variable.name() == other.name() && variable.type() == other.type()) {
@@ -222,7 +226,7 @@ class InlineStackFrameVariableHolder private constructor(
             }
 
             // Replace each visible variable by its first visible alias when sorting.
-            val sortedVariables = frame.visibleVariables().sortedBy { proxy ->
+            val sortedVariables = frame.allVisibleVariables().sortedBy { proxy ->
                 var variable = proxy.variable
                 while (true) { variable = replacements[variable] ?: break }
                 variable
@@ -231,12 +235,21 @@ class InlineStackFrameVariableHolder private constructor(
             return fromSortedVisibleVariables(sortedVariables)
         }
 
-        private fun LocalVariable.getFieldValue(name: String): Any? =
-            Class.forName("com.jetbrains.jdi.LocalVariableImpl")
-                .declaredFields
-                .single { it.name == name }
-                .also { it.isAccessible = true }
-                .get(this)
+        // Returns a list of all visible variables without shadowing.
+        private fun StackFrameProxyImpl.allVisibleVariables(): List<LocalVariableProxyImpl> {
+            val method = location().method()
+            // Can be true for artificial stack frames
+            if (stackFrame.location().method() != method) {
+                return listOf()
+            }
+
+            return method.safeVariables()?.mapNotNull { variable ->
+                if (variable.isVisible(stackFrame))
+                    LocalVariableProxyImpl(this, variable)
+                else
+                    null
+            } ?: listOf()
+        }
     }
 }
 

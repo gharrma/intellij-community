@@ -38,6 +38,16 @@
     <registryKey defaultValue="-1"
                  description="Defines the experiment group number. Negative value will be ignored."
                  key="search.everywhere.ml.experiment.group"/>
+
+    <registryKey defaultValue=""
+                 description="Path to the local action-ranking model."
+                 key="search.everywhere.ml.action.model.path"/>
+    <registryKey defaultValue=""
+                 description="Path to the local file-ranking model."
+                 key="search.everywhere.ml.files.model.path"/>
+
+    <statistician key="searchEverywhere"
+                  implementationClass="com.intellij.ide.actions.searcheverywhere.ml.features.statistician.SearchEverywhereFileStatistician"/>
   </extensions>
 
   <extensionPoints>
@@ -49,8 +59,8 @@
                     interface="com.intellij.ide.actions.searcheverywhere.ml.id.ElementKeyForIdProvider"
                     dynamic="true"/>
 
-    <extensionPoint name="rankingModelProvider"
-                    interface="com.intellij.ide.actions.searcheverywhere.ml.model.SearchEverywhereMLRankingModelProvider"
+    <extensionPoint name="rankingModelLoader"
+                    interface="com.intellij.ide.actions.searcheverywhere.ml.model.SearchEverywhereMLRankingModelLoader"
                     dynamic="true"/>
   </extensionPoints>
 
@@ -61,14 +71,16 @@
       implementation="com.intellij.ide.actions.searcheverywhere.ml.features.SearchEverywhereActionFeaturesProvider"/>
     <searchEverywhereElementFeaturesProvider
       implementation="com.intellij.ide.actions.searcheverywhere.ml.features.SearchEverywhereOptionFeaturesProvider"/>
+    <searchEverywhereElementFeaturesProvider
+      implementation="com.intellij.ide.actions.searcheverywhere.ml.features.SearchEverywhereClassFeaturesProvider"/>
 
     <elementKeyForIdProvider implementation="com.intellij.ide.actions.searcheverywhere.ml.id.ActionKeyProvider"/>
-    <elementKeyForIdProvider implementation="com.intellij.ide.actions.searcheverywhere.ml.id.FileKeyProvider"/>
+    <elementKeyForIdProvider implementation="com.intellij.ide.actions.searcheverywhere.ml.id.ClassAndFileKeyProvider"/>
 
-    <rankingModelProvider
-      implementation="com.intellij.ide.actions.searcheverywhere.ml.model.SearchEverywhereActionsRankingModelProvider"/>
-    <rankingModelProvider
-      implementation="com.intellij.ide.actions.searcheverywhere.ml.model.SearchEverywhereFilesRankingModelProvider"/>
+    <rankingModelLoader
+      implementation="com.intellij.ide.actions.searcheverywhere.ml.model.SearchEverywhereActionsRankingModelLoader"/>
+    <rankingModelLoader
+      implementation="com.intellij.ide.actions.searcheverywhere.ml.model.SearchEverywhereFilesRankingModelLoader"/>
   </extensions>
 
   <applicationListeners>

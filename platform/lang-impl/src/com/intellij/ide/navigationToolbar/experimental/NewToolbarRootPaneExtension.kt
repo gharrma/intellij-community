@@ -1,59 +1,192 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license that can be found in the LICENSE file.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.ide.navigationToolbar.experimental
 
-import com.intellij.ide.ActivityTracker
 import com.intellij.ide.ui.ToolbarSettings
 import com.intellij.ide.ui.UISettings
 import com.intellij.ide.ui.customization.CustomActionsSchema
+import com.intellij.ide.ui.customization.CustomizationUtil
 import com.intellij.ide.ui.experimental.toolbar.RunWidgetAvailabilityManager
+import com.intellij.idea.ActionsBundle
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
-import com.intellij.openapi.actionSystem.ex.ActionManagerEx
+import com.intellij.openapi.actionSystem.impl.ActionToolbarImpl
+import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.Service
+import com.intellij.openapi.components.service
 import com.intellij.openapi.diagnostic.logger
 import com.intellij.openapi.project.Project
-import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.SimpleModificationTracker
 import com.intellij.openapi.wm.IdeRootPaneNorthExtension
-import com.intellij.openapi.wm.impl.status.widget.StatusBarWidgetsManager
-import com.intellij.util.application
+import com.intellij.util.concurrency.AppExecutorUtil
+import com.intellij.util.concurrency.annotations.RequiresBackgroundThread
+import com.intellij.util.concurrency.annotations.RequiresEdt
 import com.intellij.util.messages.Topic
 import com.intellij.util.ui.JBSwingUtilities
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
 import java.awt.Graphics
-import javax.swing.BorderFactory
-import javax.swing.JComponent
-import javax.swing.JPanel
+import java.util.concurrent.CompletableFuture
+import javax.swing.*
 
-interface NewToolbarPaneListener {
+@FunctionalInterface
+fun interface ExperimentalToolbarStateListener {
   companion object {
-    val TOPIC: Topic<NewToolbarPaneListener> = Topic(
-      NewToolbarPaneListener::class.java,
+    @JvmField
+    @Topic.ProjectLevel
+    val TOPIC: Topic<ExperimentalToolbarStateListener> = Topic(
+      ExperimentalToolbarStateListener::class.java,
       Topic.BroadcastDirection.NONE,
       true,
     )
   }
 
-  fun stateChanged()
+  /**
+   * This event gets emitted when the experimental toolbar wants things dependent on its state to refresh their visibility.
+   */
+  fun refreshVisibility()
 }
 
-class NewToolbarRootPaneExtension(private val myProject: Project) : IdeRootPaneNorthExtension(), Disposable {
+@Service
+internal class NewToolbarRootPaneManager(private val project: Project) : SimpleModificationTracker(), Disposable {
+  companion object {
+    private val LOG = logger<NewToolbarRootPaneManager>()
+
+    fun getInstance(project: Project): NewToolbarRootPaneManager = project.service()
+  }
+
+  init {
+    RunWidgetAvailabilityManager.getInstance(project).addListener(this) {
+      LOG.info("New toolbar: run widget availability changed $it")
+      IdeRootPaneNorthExtension.EP_NAME.findExtension(NewToolbarRootPaneExtension::class.java, project)?.let { extension ->
+        startUpdateActionGroups(extension)
+      }
+    }
+  }
+
+  override fun dispose() {
+  }
+
+  internal fun startUpdateActionGroups(extension: NewToolbarRootPaneExtension) {
+    incModificationCount()
+
+    val panel = extension.panel
+    if (panel.isEnabled && panel.isVisible && ToolbarSettings.getInstance().isEnabled) {
+      CompletableFuture.supplyAsync(::correctedToolbarActions, AppExecutorUtil.getAppExecutorService())
+        .thenAcceptAsync({ placeToActionGroup ->
+                           applyTo(placeToActionGroup, panel, extension.layout)
+                           for ((place, actionGroup) in placeToActionGroup) {
+                             if (actionGroup == null) {
+                               val comp = extension.layout.getLayoutComponent(place)
+                               if (comp != null) {
+                                 panel.remove(comp)
+                               }
+                             }
+                           }
+                         }
+        ) {
+          ApplicationManager.getApplication().invokeLater(it, project.disposed)
+        }
+        .exceptionally {
+          LOG.error(it)
+          null
+        }
+      getToolbarGroup()?.let {
+        CustomizationUtil.installToolbarCustomizationHandler(it, mainGroupName(), panel, ActionPlaces.MAIN_TOOLBAR)
+      }
+    }
+  }
+
+  @RequiresBackgroundThread
+  private fun correctedToolbarActions(): Map<String, ActionGroup?> {
+    val toolbarGroup = getToolbarGroup() ?: return emptyMap()
+
+    val children = toolbarGroup.getChildren(null)
+
+    val leftGroup = children.firstOrNull { it.templateText.equals(ActionsBundle.message("group.LeftToolbarSideGroup.text")) }
+    val rightGroup = children.firstOrNull { it.templateText.equals(ActionsBundle.message("group.RightToolbarSideGroup.text")) }
+    val restGroup = DefaultActionGroup(children.filter { it != leftGroup && it != rightGroup })
+
+    val map = mutableMapOf<String, ActionGroup?>()
+    map[BorderLayout.WEST] = leftGroup as? ActionGroup
+    map[BorderLayout.EAST] = rightGroup as? ActionGroup
+    map[BorderLayout.CENTER] = restGroup
+
+    return map
+  }
+
+  private fun getToolbarGroup(): ActionGroup? {
+    val mainGroupName = mainGroupName()
+    return CustomActionsSchema.getInstance().getCorrectedAction(mainGroupName) as? ActionGroup
+  }
+
+  private fun mainGroupName() = if (RunWidgetAvailabilityManager.getInstance(project).isAvailable()) {
+    IdeActions.GROUP_EXPERIMENTAL_TOOLBAR
+  }
+  else {
+    IdeActions.GROUP_EXPERIMENTAL_TOOLBAR_WITHOUT_RIGHT_PART
+  }
+
+  private class MyActionToolbarImpl(place: String,
+                                    actionGroup: ActionGroup,
+                                    horizontal: Boolean, decorateButtons: Boolean,
+                                    popupActionGroup: ActionGroup?,
+                                    popupActionId: String?) : ActionToolbarImpl(place, actionGroup, horizontal, decorateButtons,
+                                                                                popupActionGroup, popupActionId) {
+
+    override fun addNotify() {
+      super.addNotify()
+      updateActionsImmediately()
+    }
+  }
+
+  @RequiresEdt
+  private fun applyTo(
+    actions: Map<String, ActionGroup?>,
+    component: JComponent,
+    layout: BorderLayout
+  ) {
+
+    actions.mapValues { (_, actionGroup) ->
+      if (actionGroup != null) {
+        val toolbar = MyActionToolbarImpl(ActionPlaces.MAIN_TOOLBAR, actionGroup, true, false, getToolbarGroup(),
+                                          mainGroupName())
+        ApplicationManager.getApplication().messageBus.syncPublisher(ActionManagerListener.TOPIC).toolbarCreated(ActionPlaces.MAIN_TOOLBAR,
+                                                                                                                 actionGroup, true, toolbar)
+        toolbar
+      }
+      else {
+        null
+      }
+    }.forEach { (layoutConstraints, toolbar) ->
+      // We need to replace old component having the same constraints with the new one.
+      if (toolbar != null) {
+
+        layout.getLayoutComponent(component, layoutConstraints)?.let {
+          component.remove(it)
+        }
+        toolbar.targetComponent = null
+        toolbar.layoutPolicy = ActionToolbar.NOWRAP_LAYOUT_POLICY
+        component.add(toolbar.component, layoutConstraints)
+      }
+    }
+    component.revalidate()
+    component.repaint()
+  }
+}
+
+internal class NewToolbarRootPaneExtension(private val project: Project) : IdeRootPaneNorthExtension() {
   companion object {
     private const val NEW_TOOLBAR_KEY = "NEW_TOOLBAR_KEY"
 
     private val logger = logger<NewToolbarRootPaneExtension>()
   }
 
-  private val runWidgetAvailabilityManager = RunWidgetAvailabilityManager.getInstance(myProject)
-  private val runWidgetListener = object : RunWidgetAvailabilityManager.RunWidgetAvailabilityListener {
-    override fun availabilityChanged(value: Boolean) {
-      reinitAndPaintAll()
-    }
-  }
-
-  private val myPanel: JPanel = object : JPanel(NewToolbarBorderLayout()) {
+  internal val layout = NewToolbarBorderLayout()
+  internal val panel: JPanel = object : JPanel(layout) {
     init {
       isOpaque = true
       border = BorderFactory.createEmptyBorder(0, JBUI.scale(4), 0, JBUI.scale(4))
+      //show ui customization option
     }
 
     override fun getComponentGraphics(graphics: Graphics?): Graphics {
@@ -61,100 +194,31 @@ class NewToolbarRootPaneExtension(private val myProject: Project) : IdeRootPaneN
     }
   }
 
-  init {
-    Disposer.register(myProject, this)
-
-    myProject.messageBus
-      .connect(this)
-      .subscribe(NewToolbarPaneListener.TOPIC, object : NewToolbarPaneListener {
-        override fun stateChanged() {
-          myPanel.doLayout()
-          myPanel.repaint()
-        }
-      })
-
-    runWidgetAvailabilityManager.addListener(runWidgetListener)
-  }
-
   override fun getKey() = NEW_TOOLBAR_KEY
 
-  private fun reinitAndDoLayout() {
-    ActivityTracker.getInstance().inc()
-
-    myPanel.removeAll()
-    if (myPanel.isVisible) {
-      val actionsSchema = CustomActionsSchema.getInstance()
-      for ((actionId, layoutConstrains) in mapOf(
-        (if (runWidgetAvailabilityManager.isAvailable()) "RightToolbarSideGroup" else "RightToolbarSideGroupNoRunWidget") to BorderLayout.EAST,
-        "CenterToolbarSideGroup" to BorderLayout.CENTER,
-        "LeftToolbarSideGroup" to BorderLayout.WEST,
-      )) {
-        val action = actionsSchema.getCorrectedAction(actionId)
-        val actionGroup = action as? ActionGroup
-                          ?: throw IllegalArgumentException("Action group '$actionId' not found; actual action: $action")
-        val toolbar = ActionManager.getInstance().createActionToolbar(
-          ActionPlaces.MAIN_TOOLBAR,
-          actionGroup,
-          true,
-        )
-        toolbar.targetComponent = myPanel
-        toolbar.layoutPolicy = ActionToolbar.NOWRAP_LAYOUT_POLICY
-        application.invokeLater {
-          toolbar.component.revalidate()
-          toolbar.component.repaint()
-        }
-        myPanel.add(toolbar as JComponent, layoutConstrains)
-      }
-    }
+  override fun getComponent(): JPanel {
+    NewToolbarRootPaneManager.getInstance(project).startUpdateActionGroups(this)
+    return panel
   }
-
-  private fun reinitAndPaintAll() {
-    reinitAndDoLayout()
-    repaint()
-  }
-
-  override fun getComponent(): JComponent = myPanel
 
   override fun uiSettingsChanged(settings: UISettings) {
     logger.info("Show old main toolbar: ${settings.showMainToolbar}; show old navigation bar: ${settings.showNavigationBar}")
-    logger.info("Show new main toolbar: ${ToolbarSettings.Instance.isVisible}")
+    logger.info("Show new main toolbar: ${ToolbarSettings.getInstance().isVisible}")
 
-    val toolbarSettings = ToolbarSettings.Instance
-    myPanel.isEnabled = toolbarSettings.isEnabled
-    myPanel.isVisible = myPanel.isEnabled && toolbarSettings.isVisible && !settings.presentationMode
+    val toolbarSettings = ToolbarSettings.getInstance()
+    panel.isEnabled = toolbarSettings.isEnabled
+    panel.isVisible = toolbarSettings.isVisible && !settings.presentationMode
+    project.messageBus.syncPublisher(ExperimentalToolbarStateListener.TOPIC).refreshVisibility()
 
-    repaint()
+    panel.revalidate()
+    panel.repaint()
+
+    NewToolbarRootPaneManager.getInstance(project).startUpdateActionGroups(this)
   }
 
-  override fun copy() = NewToolbarRootPaneExtension(myProject)
+  override fun copy() = NewToolbarRootPaneExtension(project)
 
-  override fun dispose() {
-    runWidgetAvailabilityManager.removeListener(runWidgetListener)
-  }
-
-  /**
-   * Here goes only the logic that updates the central panel when it gets customized from the UI
-   */
   override fun revalidate() {
-    if (myProject.isDisposed) {
-      logger.warn("Project '$myProject' disposal has already been initiated.")
-      return
-    }
-
-    if (ToolbarSettings.Instance.isEnabled && ToolbarSettings.Instance.isVisible) {
-      myProject.getService(StatusBarWidgetsManager::class.java).updateAllWidgets()
-      reinitAndDoLayout()
-
-      val group = CustomActionsSchema.getInstance().getCorrectedAction(IdeActions.GROUP_EXPERIMENTAL_TOOLBAR) as? CenterToolbarGroup ?: return
-      val toolBar = ActionManagerEx.getInstanceEx().createActionToolbar(ActionPlaces.MAIN_TOOLBAR, group, true)
-      toolBar.targetComponent = null
-      toolBar.layoutPolicy = ActionToolbar.WRAP_LAYOUT_POLICY
-      myPanel.add(toolBar as JComponent, BorderLayout.CENTER)
-    }
-  }
-
-  private fun repaint() {
-    myPanel.revalidate()
-    myPanel.repaint()
+    NewToolbarRootPaneManager.getInstance(project).startUpdateActionGroups(this)
   }
 }

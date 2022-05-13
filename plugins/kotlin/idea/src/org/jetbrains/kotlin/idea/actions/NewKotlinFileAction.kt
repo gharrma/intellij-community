@@ -48,7 +48,7 @@ class NewKotlinFileAction : CreateFileFromTemplateAction(
     KotlinBundle.message("action.new.file.text"),
     KotlinBundle.message("action.new.file.description"),
     KotlinFileType.INSTANCE.icon
-) {
+), DumbAware {
     override fun postProcess(createdElement: PsiFile, templateName: String?, customProperties: Map<String, String>?) {
         super.postProcess(createdElement, templateName, customProperties)
 
@@ -256,8 +256,7 @@ class NewKotlinFileAction : CreateFileFromTemplateAction(
             val (className, targetDir) = findOrCreateTarget(dir, name, directorySeparators)
 
             val service = DumbService.getInstance(dir.project)
-            service.isAlternativeResolveEnabled = true
-            try {
+            return service.computeWithAlternativeResolveEnabled<PsiFile?, Throwable> {
                 val adjustedDir = CreateTemplateInPackageAction.adjustDirectory(targetDir, JavaModuleSourceRootTypes.SOURCES)
                 val psiFile = createFromTemplate(adjustedDir, className, template)
                 if (psiFile is KtFile) {
@@ -278,9 +277,7 @@ class NewKotlinFileAction : CreateFileFromTemplateAction(
                         }
                     }
                 }
-                return psiFile
-            } finally {
-                service.isAlternativeResolveEnabled = false
+                return@computeWithAlternativeResolveEnabled psiFile
             }
         }
     }

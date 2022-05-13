@@ -11,14 +11,14 @@ import com.intellij.openapi.roots.ex.ProjectRootManagerEx
 import com.intellij.openapi.roots.ui.configuration.JdkComboBox
 import com.intellij.openapi.roots.ui.configuration.projectRoot.ProjectSdksModel
 import com.intellij.openapi.util.Condition
-import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.util.NlsContexts
-import com.intellij.ui.JBColor
+import com.intellij.ui.IdeBorderFactory
 import com.intellij.ui.TitledSeparator
-import com.intellij.ui.layout.*
+import com.intellij.ui.dsl.builder.*
+import com.intellij.ui.dsl.gridLayout.HorizontalAlign
+import com.intellij.util.ui.JBInsets
 import com.intellij.util.ui.JBUI
 import com.intellij.util.ui.components.BorderLayoutPanel
-import org.jetbrains.annotations.Nls
 import org.jetbrains.kotlin.idea.projectWizard.WizardStatsService
 import org.jetbrains.kotlin.tools.projectWizard.core.Context
 import org.jetbrains.kotlin.tools.projectWizard.core.entity.settings.SettingReference
@@ -26,11 +26,9 @@ import org.jetbrains.kotlin.tools.projectWizard.core.entity.settings.reference
 import org.jetbrains.kotlin.tools.projectWizard.plugins.StructurePlugin
 import org.jetbrains.kotlin.tools.projectWizard.plugins.buildSystem.BuildSystemPlugin
 import org.jetbrains.kotlin.tools.projectWizard.plugins.buildSystem.BuildSystemType
-import org.jetbrains.kotlin.tools.projectWizard.plugins.projectTemplates.ProjectTemplatesPlugin
 import org.jetbrains.kotlin.tools.projectWizard.wizard.IdeWizard
 import org.jetbrains.kotlin.tools.projectWizard.wizard.KotlinNewProjectWizardUIBundle
 import org.jetbrains.kotlin.tools.projectWizard.wizard.ui.*
-import org.jetbrains.kotlin.tools.projectWizard.wizard.ui.secondStep.modulesEditor.ModulesEditorComponent
 import org.jetbrains.kotlin.tools.projectWizard.wizard.ui.setting.PathSettingComponent
 import org.jetbrains.kotlin.tools.projectWizard.wizard.ui.setting.StringSettingComponent
 import org.jetbrains.kotlin.tools.projectWizard.wizard.ui.setting.TitledComponentsList
@@ -41,15 +39,9 @@ import java.awt.event.MouseEvent
 import javax.swing.JComponent
 
 class FirstWizardStepComponent(ideWizard: IdeWizard) : WizardStepComponent(ideWizard.context) {
-    private val context = ideWizard.context
     private val projectSettingsComponent = ProjectSettingsComponent(ideWizard).asSubComponent()
-    private val projectPreviewComponent = ProjectPreviewComponent(context).asSubComponent()
 
-    override val component: JComponent = SmartTwoComponentPanel(
-        projectSettingsComponent.component,
-        projectPreviewComponent.component,
-        sideIsOnTheRight = true
-    )
+    override val component: JComponent = projectSettingsComponent.component
 }
 
 class ProjectSettingsComponent(ideWizard: IdeWizard) : DynamicComponent(ideWizard.context) {
@@ -81,28 +73,29 @@ class ProjectSettingsComponent(ideWizard: IdeWizard) : DynamicComponent(ideWizar
         ),
         context,
         stretchY = true,
-        useBigYGap = true
+        useBigYGap = true,
+        xPadding = 0,
+        yPadding = 0
     ).asSubComponent()
 
     override val component: JComponent by lazy(LazyThreadSafetyMode.NONE) {
         panel {
             row {
-                nameAndLocationComponent.component(growX)
+                cell(nameAndLocationComponent.component)
+                    .horizontalAlign(HorizontalAlign.FILL)
+                    .resizableColumn()
+
+                bottomGap(BottomGap.SMALL)
             }
+
             row {
-                buildSystemAdditionalSettingsComponent.component(growX)
-            }.largeGapAfter()
-            row {
-                cell {
-                    comment(
-                        KotlinNewProjectWizardUIBundle.message(
-                            "feedback.link.tooltip.text",
-                            "https://youtrack.jetbrains.com/newIssue?project=KTIJ&Type=Feature&Subsystems=IDE.Wizards"
-                        )
-                    ).constraints(pushY)
-                }
+                cell(buildSystemAdditionalSettingsComponent.component)
+                    .horizontalAlign(HorizontalAlign.FILL)
+                    .resizableColumn()
+
+                bottomGap(BottomGap.SMALL)
             }
-        }.addBorder(JBUI.Borders.emptyRight(UIConstants.PADDING))
+        }.addBorder(IdeBorderFactory.createEmptyBorder(JBInsets(20, 20, 20, 20)))
     }
 
     override fun onValueUpdated(reference: SettingReference<*, *>?) {
@@ -141,7 +134,6 @@ class BuildSystemAdditionalSettingsComponent(
     onUserTypeInArtifactId: () -> Unit,
 ) : DynamicComponent(ideWizard.context) {
     private val pomSettingsList = PomSettingsComponent(ideWizard.context, onUserTypeInArtifactId).asSubComponent()
-    private val kotlinJpsRuntimeComponent = KotlinJpsRuntimeComponent(ideWizard).asSubComponent()
 
     override fun onValueUpdated(reference: SettingReference<*, *>?) {
         super.onValueUpdated(reference)
@@ -157,26 +149,13 @@ class BuildSystemAdditionalSettingsComponent(
 
     private fun updateBuildSystemComponent() {
         val buildSystemType = read { BuildSystemPlugin.type.settingValue }
-        val state = buildSystemType.state()
-        section.updateTitleAndComponent(state.sectionTitle, state.component)
+        section.isVisible = buildSystemType != BuildSystemType.Jps
     }
 
-    private enum class State(@Nls val sectionTitle: String) {
-        POM(KotlinNewProjectWizardUIBundle.message("additional.buildsystem.settings.artifact.coordinates")),
-        JPS(KotlinNewProjectWizardUIBundle.message("additional.buildsystem.settings.kotlin.runtime"))
-    }
-
-    private fun BuildSystemType.state() =
-        if (this == BuildSystemType.Jps) State.JPS
-        else State.POM
-
-    private val State.component
-        get() = when (this) {
-            State.POM -> pomSettingsList.component
-            State.JPS -> kotlinJpsRuntimeComponent.component
-        }
-
-    private val section = HideableSection(State.POM.sectionTitle, State.POM.component)
+    private val section = HideableSection(
+        KotlinNewProjectWizardUIBundle.message("additional.buildsystem.settings.artifact.coordinates"),
+        pomSettingsList.component
+    )
 
     override val component: JComponent = section
 }
@@ -192,18 +171,6 @@ private class PomSettingsComponent(context: Context, onUserTypeInArtifactId: () 
     context,
     stretchY = true
 )
-
-class KotlinJpsRuntimeComponent(ideWizard: IdeWizard) : DynamicComponent(ideWizard.context) {
-    private val componentList = TitledComponentsList(
-        listOf(
-            KotlinRuntimeComponentComponent(ideWizard)
-        ),
-        ideWizard.context,
-        stretchY = true
-    ).asSubComponent()
-
-    override val component: JComponent = componentList.component
-}
 
 private class JdkComponent(ideWizard: IdeWizard) : TitledComponent(ideWizard.context) {
     private val javaModuleBuilder = JavaModuleBuilder()
@@ -248,25 +215,15 @@ private class JdkComponent(ideWizard: IdeWizard) : TitledComponent(ideWizard.con
     }
 
     override val title: String = KotlinNewProjectWizardUIBundle.message("additional.buildsystem.settings.project.jdk")
-    override val tooltipText: String = KotlinNewProjectWizardUIBundle.message("additional.buildsystem.settings.project.jdk.tooltip")
     override val component: JComponent = jdkComboBox
 }
 
-private class KotlinRuntimeComponentComponent(ideWizard: IdeWizard) : TitledComponent(ideWizard.context) {
-    override val title: String = KotlinNewProjectWizardUIBundle.message("additional.buildsystem.settings.kotlin.runtime")
-    override val tooltipText: String = KotlinNewProjectWizardUIBundle.message("additional.buildsystem.settings.kotlin.runtime.desc")
-    override val component: JComponent = ideWizard.jpsData.libraryOptionsPanel.simplePanel
-
-    init {
-        Disposer.register(this, ideWizard.jpsData.libraryOptionsPanel)
-    }
-}
-
 @Suppress("SpellCheckingInspection")
-private class HideableSection(@NlsContexts.Separator text: String, private var component: JComponent) : BorderLayoutPanel() {
+private class HideableSection(@NlsContexts.Separator text: String, component: JComponent) : BorderLayoutPanel() {
     private val titledSeparator = TitledSeparator(text)
     private val contentPanel = borderPanel {
         addBorder(JBUI.Borders.emptyLeft(20))
+        addToCenter(component)
     }
     private var isExpanded = false
 
@@ -274,50 +231,15 @@ private class HideableSection(@NlsContexts.Separator text: String, private var c
         titledSeparator.label.cursor = Cursor(Cursor.HAND_CURSOR)
         addToTop(titledSeparator)
         addToCenter(contentPanel)
-        updateComponent(component)
+        update(isExpanded)
         titledSeparator.addMouseListener(object : MouseAdapter() {
             override fun mouseReleased(e: MouseEvent) = update(!isExpanded)
         })
-    }
-
-    fun updateTitleAndComponent(@NlsContexts.Separator newTitle: String, newComponent: JComponent) {
-        titledSeparator.text = newTitle
-        updateComponent(newComponent)
-    }
-
-    private fun updateComponent(newComponent: JComponent) {
-        component = newComponent
-        contentPanel.removeAll()
-        contentPanel.addToCenter(newComponent)
-        update(isExpanded)
     }
 
     private fun update(isExpanded: Boolean) {
         this.isExpanded = isExpanded
         contentPanel.isVisible = isExpanded
         titledSeparator.label.icon = if (isExpanded) AllIcons.General.ArrowDown else AllIcons.General.ArrowRight
-    }
-}
-
-class ProjectPreviewComponent(context: Context) : DynamicComponent(context) {
-    private val modulesEditorComponent = ModulesEditorComponent(
-        context,
-        null,
-        needBorder = false,
-        editable = false,
-        oneEntrySelected = {}
-    ).asSubComponent()
-
-    override val component: JComponent = borderPanel {
-        addToTop(label(KotlinNewProjectWizardUIBundle.message("project.preview"), bold = true).addBorder(JBUI.Borders.emptyBottom(5)))
-        addToCenter(modulesEditorComponent.component)
-    }.addBorder(JBUI.Borders.empty(UIConstants.PADDING,  /*left*/UIConstants.PADDING * 2, UIConstants.PADDING, UIConstants.PADDING))
-        .addBorder(JBUI.Borders.customLine(JBColor.border(), 0,  /*left*/1, 0, 0))
-
-    override fun onValueUpdated(reference: SettingReference<*, *>?) {
-        super.onValueUpdated(reference)
-        if (reference == ProjectTemplatesPlugin.template.reference) {
-            modulesEditorComponent.updateModel()
-        }
     }
 }

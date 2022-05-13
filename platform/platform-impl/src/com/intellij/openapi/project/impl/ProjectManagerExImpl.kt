@@ -1,4 +1,4 @@
-// Copyright 2000-2021 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
+// Copyright 2000-2022 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 @file:Suppress("ReplaceNegatedIsEmptyWithIsNotEmpty")
 package com.intellij.openapi.project.impl
 
@@ -24,10 +24,7 @@ import com.intellij.openapi.module.ModuleManager
 import com.intellij.openapi.progress.ProcessCanceledException
 import com.intellij.openapi.progress.ProgressIndicator
 import com.intellij.openapi.progress.ProgressManager
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.project.ProjectBundle
-import com.intellij.openapi.project.ProjectManager
-import com.intellij.openapi.project.getProjectDataPathRoot
+import com.intellij.openapi.project.*
 import com.intellij.openapi.startup.StartupManager
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.util.NlsSafe
@@ -38,6 +35,7 @@ import com.intellij.openapi.wm.WindowManager
 import com.intellij.openapi.wm.impl.WindowManagerImpl
 import com.intellij.openapi.wm.impl.welcomeScreen.WelcomeFrame
 import com.intellij.platform.PlatformProjectOpenProcessor
+import com.intellij.platform.PlatformProjectOpenProcessor.Companion.isLoadedFromCacheButHasNoModules
 import com.intellij.project.ProjectStoreOwner
 import com.intellij.projectImport.ProjectAttachProcessor
 import com.intellij.projectImport.ProjectOpenedCallback
@@ -47,12 +45,12 @@ import com.intellij.util.ThreeState
 import com.intellij.util.io.delete
 import com.intellij.util.io.exists
 import org.jetbrains.annotations.ApiStatus
+import org.jetbrains.annotations.TestOnly
 import java.awt.event.InvocationEvent
 import java.io.IOException
 import java.nio.file.*
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
-import java.util.function.BiFunction
 
 @ApiStatus.Internal
 open class ProjectManagerExImpl : ProjectManagerImpl() {
@@ -115,8 +113,12 @@ open class ProjectManagerExImpl : ProjectManagerImpl() {
   private fun doOpenAsync(options: OpenProjectTask,
                           projectStoreBaseDir: Path,
                           activity: Activity): CompletableFuture<Project?> {
-    val frameAllocator = if (ApplicationManager.getApplication().isHeadlessEnvironment) ProjectFrameAllocator(options)
-    else ProjectUiFrameAllocator(options, projectStoreBaseDir)
+    val frameAllocator = if (ApplicationManager.getApplication().isHeadlessEnvironment) {
+      ProjectFrameAllocator(options)
+    }
+    else {
+      ProjectUiFrameAllocator(options, projectStoreBaseDir)
+    }
     val disableAutoSaveToken = SaveAndSyncHandler.getInstance().disableAutoSave()
     return frameAllocator.run { indicator ->
       activity.end()
@@ -150,7 +152,7 @@ open class ProjectManagerExImpl : ProjectManagerImpl() {
       frameAllocator.projectOpened(project)
       result
     }
-      .handle(BiFunction { result, error ->
+      .handle { result, error ->
         disableAutoSaveToken.finish()
 
         if (error != null) {
@@ -162,7 +164,7 @@ open class ProjectManagerExImpl : ProjectManagerImpl() {
           if (options.showWelcomeScreen) {
             WelcomeFrame.showIfNoProjectOpened()
           }
-          return@BiFunction null
+          return@handle null
         }
 
         val project = result.project
@@ -170,14 +172,15 @@ open class ProjectManagerExImpl : ProjectManagerImpl() {
           options.callback!!.projectOpened(project, result.module ?: ModuleManager.getInstance(project).modules[0])
         }
         project
-      })
+      }
   }
 
   private fun handleProjectOpenCancelOrFailure(project: Project) {
-    ApplicationManager.getApplication().invokeAndWait {
+    val app = ApplicationManager.getApplication()
+    app.invokeAndWait {
       closeProject(project, /* saveProject = */false, /* dispose = */true, /* checkCanClose = */false)
     }
-    ApplicationManager.getApplication().messageBus.syncPublisher(AppLifecycleListener.TOPIC).projectOpenFailed()
+    app.messageBus.syncPublisher(AppLifecycleListener.TOPIC).projectOpenFailed()
   }
 
   /**
@@ -354,15 +357,14 @@ open class ProjectManagerExImpl : ProjectManagerImpl() {
       return null
     }
 
-    if (options.runConfigurators && (options.isNewProject || ModuleManager.getInstance(project).modules.isEmpty())) {
+    if (options.runConfigurators && (options.isNewProject || ModuleManager.getInstance(project).modules.isEmpty()) ||
+      project.isLoadedFromCacheButHasNoModules()) {
       val module = PlatformProjectOpenProcessor.runDirectoryProjectConfigurators(projectStoreBaseDir, project,
                                                                                  options.isProjectCreatedWithWizard)
       options.preparedToOpen?.invoke(module)
       return PrepareProjectResult(project, module)
     }
-    else {
-      return PrepareProjectResult(project, module = null)
-    }
+    return PrepareProjectResult(project, module = null)
   }
 
   protected open fun isRunStartUpActivitiesEnabled(project: Project): Boolean = true
@@ -430,8 +432,9 @@ open class ProjectManagerExImpl : ProjectManagerImpl() {
     return result
   }
 
-  private fun closeAndDisposeKeepingFrame(project: Project) =
-    (WindowManager.getInstance() as WindowManagerImpl).runWithFrameReuseEnabled { closeAndDispose(project) }
+  private fun closeAndDisposeKeepingFrame(project: Project): Boolean {
+    return (WindowManager.getInstance() as WindowManagerImpl).runWithFrameReuseEnabled { closeAndDispose(project) }
+  }
 }
 
 @NlsSafe
@@ -446,6 +449,24 @@ private fun message(e: Throwable): String {
   return "$message (cause: $causeMessage)"
 }
 
+private inline fun executeInEdtWithProgress(indicator: ProgressIndicator?, crossinline task: () -> Unit) {
+  var pce: ProcessCanceledException? = null
+  ApplicationManager.getApplication().invokeAndWait {
+    try {
+       if (indicator == null) {
+        task()
+      }
+      else {
+        ProgressManager.getInstance().executeProcessUnderProgress({ task() }, indicator)
+      }
+    }
+    catch (e: ProcessCanceledException) {
+      pce = e
+    }
+  }
+  pce?.let { throw it }
+}
+
 private fun openProject(project: Project, indicator: ProgressIndicator?, runStartUpActivities: Boolean): CompletableFuture<*> {
   val waitEdtActivity = StartUpMeasurer.startActivity("placing calling projectOpened on event queue")
   if (indicator != null) {
@@ -455,15 +476,17 @@ private fun openProject(project: Project, indicator: ProgressIndicator?, runStar
   }
 
   // invokeLater cannot be used for now
-  ApplicationManager.getApplication().invokeAndWait {
+  executeInEdtWithProgress(indicator) {
     waitEdtActivity.end()
+
+    indicator?.checkCanceled()
+
     if (indicator != null && ApplicationManager.getApplication().isInternal) {
       indicator.text = "Running project opened tasks..."  // NON-NLS (internal mode)
     }
 
     ProjectManagerImpl.LOG.debug("projectOpened")
 
-    LifecycleUsageTriggerCollector.onProjectOpened(project)
     val activity = StartUpMeasurer.startActivity("project opened callbacks")
 
     runActivity("projectOpened event executing") {
@@ -473,50 +496,53 @@ private fun openProject(project: Project, indicator: ProgressIndicator?, runStar
     @Suppress("DEPRECATION")
     (project as ComponentManagerEx)
       .processInitializedComponents(com.intellij.openapi.components.ProjectComponent::class.java) { component, pluginDescriptor ->
-      ProgressManager.checkCanceled()
-      try {
-        val componentActivity = StartUpMeasurer.startActivity(component.javaClass.name, ActivityCategory.PROJECT_OPEN_HANDLER,
-          pluginDescriptor.pluginId.idString)
-        component.projectOpened()
-        componentActivity.end()
+        indicator?.checkCanceled()
+        try {
+          val componentActivity = StartUpMeasurer.startActivity(component.javaClass.name, ActivityCategory.PROJECT_OPEN_HANDLER,
+                                                                pluginDescriptor.pluginId.idString)
+          component.projectOpened()
+          componentActivity.end()
+        }
+        catch (e: ProcessCanceledException) {
+          throw e
+        }
+        catch (e: Throwable) {
+          ProjectManagerImpl.LOG.error(e)
+        }
       }
-      catch (e: ProcessCanceledException) {
-        throw e
-      }
-      catch (e: Throwable) {
-        ProjectManagerImpl.LOG.error(e)
-      }
-    }
 
     activity.end()
-    ProjectImpl.ourClassesAreLoaded = true
   }
+
+  ProjectImpl.ourClassesAreLoaded = true
 
   if (runStartUpActivities) {
     (StartupManager.getInstance(project) as StartupManagerImpl).projectOpened(indicator)
   }
 
+  LifecycleUsageTriggerCollector.onProjectOpened(project)
   return CompletableFuture.completedFuture(null)
 }
 
 // allow `invokeAndWait` inside startup activities
+@TestOnly
 internal fun waitAndProcessInvocationEventsInIdeEventQueue(startupManager: StartupManagerImpl) {
+  ApplicationManager.getApplication().assertIsDispatchThread()
   val eventQueue = IdeEventQueue.getInstance()
+  if (startupManager.postStartupActivityPassed()) {
+    ApplicationManager.getApplication().invokeLater {}
+  }
+  else {
+    // make sure eventQueue.nextEvent will unblock
+    startupManager.registerPostStartupActivity(DumbAwareRunnable { ApplicationManager.getApplication().invokeLater{ } })
+  }
   while (true) {
-    // getNextEvent() will block until an event has been posted by another thread, so,
-    // peekEvent() is used to check that there is already some event in the queue
-    if (eventQueue.peekEvent() == null) {
-      if (startupManager.postStartupActivityPassed()) {
-        break
-      }
-      else {
-        continue
-      }
-    }
-
     val event = eventQueue.nextEvent
     if (event is InvocationEvent) {
       eventQueue.dispatchEvent(event)
+    }
+    if (startupManager.postStartupActivityPassed() && eventQueue.peekEvent() == null) {
+      break
     }
   }
 }
@@ -530,7 +556,7 @@ private fun toCanonicalName(filePath: String): Path {
       return file.toRealPath(LinkOption.NOFOLLOW_LINKS)
     }
   }
-  catch (e: InvalidPathException) {
+  catch (ignore: InvalidPathException) {
   }
   catch (e: IOException) {
     // OK. File does not yet exist, so its canonical path will be equal to its original path.

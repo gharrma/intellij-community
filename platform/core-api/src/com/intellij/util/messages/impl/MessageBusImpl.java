@@ -4,6 +4,7 @@ package com.intellij.util.messages.impl;
 import com.intellij.codeWithMe.ClientId;
 import com.intellij.diagnostic.PluginException;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.AccessToken;
 import com.intellij.openapi.diagnostic.Logger;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.util.ArrayUtilRt;
@@ -400,11 +401,10 @@ public class MessageBusImpl implements MessageBus {
                                                    @NotNull MessageQueue jobQueue,
                                                    @Nullable MessageDeliveryListener messageDeliveryListener,
                                                    @Nullable List<Throwable> exceptions) {
-    ClientId oldClientId = ClientId.getCurrentOrNull();
-    try {
-      ClientId.trySetCurrentClientId(job.clientId);
+    try (AccessToken ignored = ClientId.withClientId(job.clientId)) {
       jobQueue.current = job;
       Object[] handlers = job.handlers;
+      List<Throwable> result = exceptions;
       for (int index = job.currentHandlerIndex, size = handlers.length, lastIndex = size - 1; index < size; ) {
         if (index == lastIndex) {
           jobQueue.current = null;
@@ -414,17 +414,14 @@ public class MessageBusImpl implements MessageBus {
         job.currentHandlerIndex++;
         Object handler = handlers[index];
         if (handler != null) {
-          exceptions = invokeListener(job.method, job.methodName, job.args, job.topic, handler, messageDeliveryListener, exceptions);
+          result = invokeListener(job.method, job.methodName, job.args, job.topic, handler, messageDeliveryListener, result);
         }
         if (++index != job.currentHandlerIndex) {
           // handler published some event and message queue including current job was processed as result, so, stop processing
-          return exceptions;
+          return result;
         }
       }
-      return exceptions;
-    }
-    finally {
-      ClientId.trySetCurrentClientId(oldClientId);
+      return result;
     }
   }
 
@@ -655,6 +652,7 @@ public class MessageBusImpl implements MessageBus {
 
   static final class RootBus extends CompositeMessageBus {
     private final AtomicReference<CompletableFuture<?>> compactionFutureRef = new AtomicReference<>();
+    private final AtomicInteger compactionRequest = new AtomicInteger();
     private final AtomicInteger emptyConnectionCounter = new AtomicInteger();
 
     /**
@@ -673,15 +671,17 @@ public class MessageBusImpl implements MessageBus {
         return;
       }
 
-      CompletableFuture<?> oldFuture = compactionFutureRef.get();
-      if (oldFuture == null) {
-        CompletableFuture<?> future = CompletableFuture.runAsync(() -> {
-          removeEmptyConnectionsRecursively();
-          compactionFutureRef.set(null);
-        }, AppExecutorUtil.getAppExecutorService());
-        if (!compactionFutureRef.compareAndSet(null, future)) {
-          future.cancel(false);
-        }
+      // The first thread detected a need for compaction schedules a compaction task.
+      // The task runs until all compaction requests are served.
+      if (compactionRequest.incrementAndGet() == 1) {
+        compactionFutureRef.set(CompletableFuture.runAsync(() -> {
+          int request;
+          do {
+            request = compactionRequest.get();
+            removeEmptyConnectionsRecursively();
+          }
+          while (!compactionRequest.compareAndSet(request, 0));
+        }, AppExecutorUtil.getAppExecutorService()));
       }
     }
 
@@ -691,6 +691,7 @@ public class MessageBusImpl implements MessageBus {
       if (compactionFuture != null) {
         compactionFuture.cancel(false);
       }
+      compactionRequest.set(0);
       super.dispose();
     }
   }

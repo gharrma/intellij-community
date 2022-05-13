@@ -1,6 +1,6 @@
 // "Propagate 'PropertyTypeMarker' opt-in requirement to constructor" "true"
 // COMPILER_ARGUMENTS: -Xopt-in=kotlin.RequiresOptIn
-// WITH_RUNTIME
+// WITH_STDLIB
 // ACTION: Propagate 'PropertyTypeMarker' opt-in requirement to containing class 'PropertyTypeContainer'
 
 @RequiresOptIn

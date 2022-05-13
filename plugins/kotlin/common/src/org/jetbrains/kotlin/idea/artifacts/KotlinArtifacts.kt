@@ -59,15 +59,9 @@ private object ProductionKotlinArtifacts : KotlinArtifacts(run {
 
     val libFile = pluginJar.parent.takeIf { it.name == "lib" }
     if (libFile == null || !libFile.exists()) {
-        if ("compile-server" in pluginJar.pathString && pluginJar.resolveSibling("kotlinc").exists()) {
-            // WSL JPS build copies all JPS plugin jars to the cache directory, without an intervening 'lib' directory,
-            // and the kotlinc directory becomes a subdirectory of the cache directory (see KotlinBuildProcessParametersProvider.getAdditionalPluginPaths())
-            pluginJar.parent.resolve("kotlinc").toFile()
-        } else {
-            // Don't throw exception because someone may want to just try to initialize
-            // KotlinArtifacts but won't actually use it. E.g. KotlinPluginMacros does it
-            File("\"<invalid_kotlinc_path>\"")
-        }
+        // Don't throw exception because someone may want to just try to initialize
+        // KotlinArtifacts but won't actually use it. E.g. KotlinPluginMacros does it
+        File("\"<invalid_kotlinc_path>\"")
     } else {
         libFile.parent.resolve("kotlinc").toFile()
     }
@@ -79,7 +73,7 @@ private object KotlinArtifactsFromSources : KotlinArtifacts(run {
         "org.jetbrains.kotlin",
         "kotlin-dist-for-ide"
     )
-    lazyUnpackJar(jar, File(PathManager.getHomePath(), "out").resolve("kotlinc-dist"), "kotlinc")
+    lazyUnpackJar(jar, File(PathManager.getSystemPath()).resolve("kotlinc-dist-for-ide-from-sources"), "kotlinc")
 })
 
 internal fun lazyUnpackJar(jar: File, holderDir: File, dirName: String): File {

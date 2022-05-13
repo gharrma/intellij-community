@@ -2,7 +2,7 @@
 
 package org.jetbrains.kotlin.idea.completion
 
-import com.intellij.codeInsight.completion.InsertionContext
+import com.intellij.codeInsight.completion.InsertHandler
 import com.intellij.codeInsight.lookup.LookupElement
 import com.intellij.codeInsight.lookup.LookupElementDecorator
 import com.intellij.codeInsight.lookup.LookupElementPresentation
@@ -50,7 +50,7 @@ class OverridesCompletionLookupElementDecorator(
         presentation.setTypeText(baseClassName, baseClassIcon)
     }
 
-    override fun handleInsert(context: InsertionContext) {
+    override fun getDelegateInsertHandler(): InsertHandler<LookupElement> = InsertHandler { context, _ ->
         val dummyMemberHead = when {
             declaration != null -> ""
             isConstructorParameter -> "override val "
@@ -78,7 +78,7 @@ class OverridesCompletionLookupElementDecorator(
         context.document.replaceString(startOffset, tailOffset, dummyMemberText)
 
         val psiDocumentManager = PsiDocumentManager.getInstance(context.project)
-        psiDocumentManager.commitAllDocuments()
+        psiDocumentManager.commitDocument(context.document)
 
         val dummyMember = context.file.findElementAt(startOffset)!!.getStrictParentOfType<KtNamedDeclaration>()!!
 
