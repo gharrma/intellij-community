@@ -1,18 +1,24 @@
 // Copyright 2000-2024 JetBrains s.r.o. and contributors. Use of this source code is governed by the Apache 2.0 license.
 package com.intellij.testFramework.common;
 
+import com.intellij.concurrency.ThreadContext;
 import com.intellij.diagnostic.JVMResponsivenessMonitor;
 import com.intellij.diagnostic.PerformanceWatcher;
 import com.intellij.execution.process.ProcessIOExecutorService;
+import com.intellij.ide.IdeEventQueue;
 import com.intellij.openapi.Disposable;
+import com.intellij.openapi.application.ModalityState;
 import com.intellij.openapi.util.Disposer;
 import com.intellij.openapi.util.Pair;
+import com.intellij.openapi.util.Ref;
 import com.intellij.openapi.util.ShutDownTracker;
 import com.intellij.util.FlushingDaemon;
+import com.intellij.util.concurrency.EdtScheduledExecutorService;
+import com.intellij.util.concurrency.Semaphore;
 import com.intellij.util.containers.ContainerUtil;
 import com.intellij.util.io.FilePageCacheLockFree;
 import com.intellij.util.ui.EDT;
-import com.intellij.util.ui.UIUtil;
+import java.awt.event.InvocationEvent;
 import org.jetbrains.annotations.ApiStatus.Internal;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.TestOnly;
@@ -170,12 +176,7 @@ public final class ThreadLeakTracker {
     StackTraceElement[] stackTrace = traceBeforeWait;
     while (System.currentTimeMillis() < deadlineMs) {
       // give a blocked thread an opportunity to die if it's stuck doing invokeAndWait()
-      if (EDT.isCurrentThreadEdt()) {
-        UIUtil.dispatchAllInvocationEvents();
-      }
-      else {
-        UIUtil.pump();
-      }
+      dispatchInvocationEventsForSomeTime();
       // after some time, the submitted task can finish and the thread can become idle
       stackTrace = thread.getStackTrace();
       if (shouldIgnore(thread, stackTrace)) break;
@@ -201,6 +202,31 @@ public final class ThreadLeakTracker {
       "\n\nLeaking threads dump:\n" + dumpThreadsToString(after, stackTraces) +
       "\n----\nAll other threads dump:\n" + dumpThreadsToString(all, otherStackTraces)
     );
+  }
+
+  // dispatches invocation events for at least 10 ms - without busy-waiting, otherwise other threads
+  // could get stuck yielding priority to this one (see sleepIfNeededToGivePriorityToAnotherThread)
+  private static void dispatchInvocationEventsForSomeTime() {
+    if (EDT.isCurrentThreadEdt()) {
+      // to avoid busy-waiting, block on getNextEvent() — and schedule a terminating event to break out
+      var keepGoing = new Ref<>(true);
+      EdtScheduledExecutorService.getInstance().schedule(() -> keepGoing.set(false), ModalityState.any(), 10, TimeUnit.MILLISECONDS);
+      // the following is similar to PlatformTestUtil.dispatchAllInvocationEventsInIdeEventQueue()
+      var eventQueue = IdeEventQueue.getInstance();
+      try (var ignored = ThreadContext.resetThreadContext()) {
+        while (keepGoing.get()) {
+          var event = eventQueue.getNextEvent();
+          if (event instanceof InvocationEvent) {
+            eventQueue.dispatchEvent(event);
+          }
+        }
+      }
+    }
+    else {
+      var lock = new Semaphore(1);
+      EdtScheduledExecutorService.getInstance().schedule(lock::up, ModalityState.any(), 10, TimeUnit.MILLISECONDS);
+      lock.waitFor();
+    }
   }
 
   private static boolean shouldWaitForThread(Thread thread) {
